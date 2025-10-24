@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <!-- ¡MUY IMPORTANTE para móviles! -->
+    <!-- Ajusta la pantalla y deshabilita el zoom del usuario -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <title>Snake-Snakes</title>
+    <style>
+        body {
+            background-color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh; /* Ocupa toda la altura */
+            margin: 0;
+            overflow: hidden; /* Evita barras de scroll */
+        }
+        canvas {
+            background-color: #000;
+            border: 2px solid white;
+
+            /* Escala el canvas para que quepa en la pantalla del móvil */
+            /* vmin = 95% de la dimensión más pequeña (ancho o alto) */
+            width: 95vmin;
+            height: 95vmin;
+
+            object-fit: contain; /* Mantiene la relación de aspecto 1:1 */
+
+            /* ¡CRÍTICO! Evita que el navegador se mueva (scroll) */
+            /* cuando el usuario desliza el dedo sobre el canvas */
+            touch-action: none;
+        }
+    </style>
+</head>
+<body>
+<!-- El tamaño lógico sigue siendo 640x640 como en tu GameState -->
+<canvas id="gameCanvas" width="640" height="640"></canvas>
+
+<!-- Este script ahora tendrá controles táctiles -->
+<script src="game.js"></script>
+</body>
+</html>

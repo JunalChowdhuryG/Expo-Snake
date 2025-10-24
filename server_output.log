@@ -1,0 +1,14 @@
+2025/10/24 14:35:37: Mapa para el Nivel 1 cargado con 0 muros.
+2025/10/24 14:35:37: Servidor WebSocket iniciado en el puerto 12345
+2025/10/24 14:35:37: Servidor WebSocket arrancado exitosamente.
+2025/10/24 14:36:40: Jugador 0 añadido.
+2025/10/24 14:36:40: Nuevo cliente conectado: /10.60.0.128:40630 como Jugador 0
+2025/10/24 14:38:20: Jugador 1 añadido.
+2025/10/24 14:38:20: Nuevo cliente conectado: /10.60.0.231:52344 como Jugador 1
+2025/10/24 14:39:15: Jugador 1 eliminado.
+2025/10/24 14:39:15: Cliente desconectado: Jugador 1
+2025/10/24 14:39:18: Jugador 0 eliminado.
+2025/10/24 14:39:18: Cliente desconectado: Jugador 0
+2025/10/24 14:39:22: Deteniendo el servidor WebSocket...
+2025/10/24 14:39:22: Bucle del juego detenido.
+2025/10/24 14:39:22: Servidor detenido.
