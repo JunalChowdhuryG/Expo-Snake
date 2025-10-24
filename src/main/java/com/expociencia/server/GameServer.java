@@ -16,16 +16,11 @@ import org.java_websocket.server.WebSocketServer;
 
 public class GameServer extends WebSocketServer {
 
-    // --- CORRECCIÓN: 'serverSocket' y 'running' eliminados ---
-    // private ServerSocket serverSocket; // Ya no se necesita
-    // private boolean running = true; // El WebSocketServer maneja su propio ciclo de vida
-
     private GameState gameState;
     private Timer gameTimer;
     private int updateInterval = 150;
 
-    // Almacenamiento de clientes WebSocket
-    private Set<WebSocket> clients = new CopyOnWriteArraySet<>();
+    // Almacena conexiones (clientes) que se han unido al juego
     private Map<WebSocket, Integer> playerConnections = new ConcurrentHashMap<>();
     private int nextPlayerId = 0;
     private Gson gson = new Gson();
@@ -36,44 +31,84 @@ public class GameServer extends WebSocketServer {
         ServerLogger.log("Servidor WebSocket iniciado en el puerto " + port);
     }
 
-    // --- MÉTODOS REQUERIDOS POR WebSocketServer ---
 
     @Override
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
-        int playerId = nextPlayerId++;
-        clients.add(conn);
-        playerConnections.put(conn, playerId);
-
-        gameState.addPlayer(playerId);
-
-        ServerLogger.log("Nuevo cliente conectado: " + conn.getRemoteSocketAddress() + " como Jugador " + playerId);
-
-        // Enviar el ID de jugador al nuevo cliente
-        Message idMessage = new Message("PLAYER_ID");
-        idMessage.setPlayerId(playerId);
-        conn.send(gson.toJson(idMessage));
+        // NO añadir al jugador todavía. Solo esperar a que envíe su nombre.
+        ServerLogger.log("Nueva conexión entrante: " + conn.getRemoteSocketAddress());
     }
 
     @Override
     public void onClose(WebSocket conn, int code, String reason, boolean remote) {
         Integer playerId = playerConnections.remove(conn);
-        clients.remove(conn);
         if (playerId != null) {
             gameState.removePlayer(playerId);
             ServerLogger.log("Cliente desconectado: Jugador " + playerId);
+            broadcastState(); // Notificar a todos que el jugador se fue
+        } else {
+            ServerLogger.log("Conexión (no unida) cerrada: " + conn.getRemoteSocketAddress());
         }
     }
 
     @Override
     public void onMessage(WebSocket conn, String message) {
-        Integer playerId = playerConnections.get(conn);
-        if (playerId == null) return;
-
         try {
             Message inputMessage = gson.fromJson(message, Message.class);
-            if ("PLAYER_INPUT".equals(inputMessage.getAction())) {
-                gameState.handleInput(playerId, inputMessage.getInput());
+            Integer playerId = playerConnections.get(conn); // Puede ser null si aún no se une
+
+            // --- Lógica de Mensajes Múltiples ---
+            switch (inputMessage.getAction()) {
+                case "JOIN_GAME":
+                    if (playerId == null) { // Nuevo jugador
+                        int newPlayerId = nextPlayerId++;
+                        playerConnections.put(conn, newPlayerId);
+
+                        String playerName = inputMessage.getPlayerName();
+                        if (playerName == null || playerName.trim().isEmpty()) {
+                            playerName = "Player " + newPlayerId;
+                        }
+                        // Truncar a 6 caracteres
+                        if (playerName.length() > 6) {
+                            playerName = playerName.substring(0, 6);
+                        }
+
+                        gameState.addPlayer(newPlayerId, playerName);
+
+                        // Enviar al jugador su ID
+                        Message idMessage = new Message("PLAYER_ID");
+                        idMessage.setPlayerId(newPlayerId);
+                        conn.send(gson.toJson(idMessage));
+
+                        ServerLogger.log("Jugador " + newPlayerId + " (" + playerName + ") se unió.");
+                        broadcastState(); // Enviar estado del lobby a todos
+                    }
+                    break;
+
+                case "PLAYER_INPUT":
+                    if (playerId != null) {
+                        gameState.handleInput(playerId, inputMessage.getInput());
+                    }
+                    break;
+
+                case "START_GAME":
+                    // Solo el primer jugador (ID 0) puede iniciar el juego
+                    if (playerId != null && playerId == 0 && !gameState.isGameInProgress()) {
+                        ServerLogger.log("Jugador 0 inició el juego.");
+                        gameState.startGame();
+                        broadcastState(); // Notificar a todos que el juego comenzó
+                    }
+                    break;
+
+                case "RESTART_GAME":
+                    // Cualquiera puede reiniciar si el juego terminó
+                    if (playerId != null && gameState.isGameOver()) {
+                        ServerLogger.log("Juego reiniciado por Jugador " + playerId);
+                        gameState.resetGame();
+                        broadcastState(); // Enviar a todos de vuelta al lobby
+                    }
+                    break;
             }
+
         } catch (Exception e) {
             ServerLogger.error("Error procesando mensaje JSON: " + message, e);
         }
@@ -83,16 +118,13 @@ public class GameServer extends WebSocketServer {
     public void onError(WebSocket conn, Exception ex) {
         ServerLogger.error("Error en WebSocket", ex);
         if (conn != null) {
-            // Cierra la conexión si ocurre un error
-            onClose(conn, 0, "error", false);
+            onClose(conn, 0, "error", false); // Manejar el cierre
         }
     }
 
     @Override
     public void onStart() {
         ServerLogger.log("Servidor WebSocket arrancado exitosamente.");
-        // Este método es requerido, pero no necesitamos poner nada aquí
-        // porque nuestro bucle de juego se inicia desde main.
     }
 
     // --- LÓGICA DEL JUEGO (Tus métodos) ---
@@ -115,7 +147,7 @@ public class GameServer extends WebSocketServer {
                         return;
                     }
 
-                    if (!clients.isEmpty()) {
+                    if (!playerConnections.isEmpty()) {
                         broadcastState();
                     }
                 } catch (Exception e) {
@@ -126,21 +158,25 @@ public class GameServer extends WebSocketServer {
     }
 
     private void broadcastState() {
-        if (clients.isEmpty()) return;
+        if (playerConnections.isEmpty()) return;
 
         Message message = new Message("UPDATE_STATE");
         message.setObjects(gameState.getGameObjects());
         message.setGameOver(gameState.isGameOver());
-        message.getPlayerScores().putAll(gameState.getPlayerScores());
+
+        // --- NUEVO ---
+        message.setGameInProgress(gameState.isGameInProgress());
+        message.setPlayerScores(gameState.getPlayerScores());
+        message.setPlayerNames(gameState.getPlayerNames());
+        // --- FIN NUEVO ---
 
         String jsonState = gson.toJson(message);
 
-        // Enviar a todos los clientes (la librería maneja desconexiones)
-        broadcast(jsonState);
+        for (WebSocket client : playerConnections.keySet()) {
+            client.send(jsonState);
+        }
     }
 
-    // --- CORRECCIÓN: Método stop() actualizado ---
-    // Este método es llamado por el ShutdownHook en main
     @Override
     public void stop(int timeout) throws InterruptedException {
         ServerLogger.log("Deteniendo el servidor WebSocket...");

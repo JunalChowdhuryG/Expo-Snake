@@ -35,7 +35,7 @@ public class ClientHandler extends Thread {
             this.out.flush();
 
             // Add player to game state
-            gameState.addPlayer(playerId);
+            //gameState.addPlayer(playerId);
 
             // Send initial game state
             sendInitialState();

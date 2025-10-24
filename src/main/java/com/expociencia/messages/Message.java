@@ -7,90 +7,84 @@ import java.util.Map;
 import com.expociencia.game.GameObject;
 
 public class Message implements Serializable {
-    private static final long serialVersionUID = 2L;
+    private static final long serialVersionUID = 4L; // Versión actualizada
 
-    private String action; // e.g., "UPDATE_STATE", "PLAYER_INPUT"
-    private ArrayList<GameObject> objects; // Game state
-    private int score;
+    private String action; // e.g., "JOIN_GAME", "PLAYER_INPUT", "START_GAME", "RESTART_GAME"
+    private ArrayList<GameObject> objects;
     private boolean gameOver;
-    private String input; // e.g., "LEFT", "RIGHT", "SHOOT", "RESTART"
+    private String input; // e.g., "UP", "DOWN"
     private int playerId;
-    private Map<Integer, Integer> playerScores = new HashMap<>(); // Individual player scores
+
+    // --- NUEVOS CAMPOS ---
+    private String playerName; // Para enviar el nombre del jugador al unirse
+    private Map<Integer, Integer> playerScores = new HashMap<>();
+    private Map<Integer, String> playerNames = new HashMap<>(); // Para la tabla de puntuación
+    private boolean gameInProgress; // Para saber si estamos en el lobby o jugando
 
     public Message(String action) {
         this.action = action;
         this.objects = new ArrayList<>();
-        this.score = 0;
         this.gameOver = false;
         this.input = "";
         this.playerId = -1;
     }
 
-    public void setAction(String action) {
-        this.action = action;
-    }
+    // --- Getters y Setters para todos los campos ---
+    // (Asegúrate de tenerlos para todos: action, objects, gameOver, input, playerId,
+    // playerName, playerScores, playerNames, gameInProgress)
 
     public String getAction() {
         return action;
     }
-    
-    public void setObjects(ArrayList<GameObject> objects) {
-        this.objects = objects;
+    public void setAction(String action) {
+        this.action = action;
     }
-
     public ArrayList<GameObject> getObjects() {
         return objects;
     }
-    
-    public void setScore(int score) {
-        this.score = score;
+    public void setObjects(ArrayList<GameObject> objects) {
+        this.objects = objects;
     }
-
-    public int getScore() {
-        return score;
-    }
-
-    public void setGameOver(boolean gameOver) {
-        this.gameOver = gameOver;
-    }
-
     public boolean isGameOver() {
         return gameOver;
     }
-    
-    public void setInput(String input) {
-        this.input = input;
+    public void setGameOver(boolean gameOver) {
+        this.gameOver = gameOver;
     }
-
     public String getInput() {
         return input;
     }
-    
-    public void setPlayerId(int playerId) {
-        this.playerId = playerId;
+    public void setInput(String input) {
+        this.input = input;
     }
-
     public int getPlayerId() {
         return playerId;
     }
-    
-    public void setPlayerScores(Map<Integer, Integer> playerScores) {
-        this.playerScores = playerScores;
+    public void setPlayerId(int playerId) {
+        this.playerId = playerId;
+    }
+    public String getPlayerName() {
+        return playerName;
+    }
+    public void setPlayerName(String playerName) {
+        this.playerName = playerName;
     }
     public Map<Integer, Integer> getPlayerScores() {
         return playerScores;
     }
-
-    @Override
-    public String toString() {
-        return "Mensage{" +
-                "accion='" + action + '\'' +
-                ", playerId=" + playerId +
-                ", input='" + input + '\'' +
-                ", objects.size=" + (objects != null ? objects.size() : 0) +
-                ", score=" + score +
-                ", gameOver=" + gameOver +
-                ", playerScores=" + playerScores +
-                '}';
+    public void setPlayerScores(Map<Integer, Integer> playerScores) {
+        this.playerScores = playerScores;
+    }
+    public Map<Integer, String> getPlayerNames() {
+        return playerNames;
+    }
+    public void setPlayerNames(Map<Integer, String> playerNames) {
+        this.playerNames = playerNames;
+    }
+    public boolean isGameInProgress() {
+        return gameInProgress;
+    }
+    public void setGameInProgress(boolean gameInProgress) {
+        this.gameInProgress = gameInProgress;
     }
 }

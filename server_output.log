@@ -12,3 +12,71 @@
 2025/10/24 14:39:22: Deteniendo el servidor WebSocket...
 2025/10/24 14:39:22: Bucle del juego detenido.
 2025/10/24 14:39:22: Servidor detenido.
+2025/10/24 15:59:26: Servidor WebSocket iniciado en el puerto 12345
+2025/10/24 15:59:27: Servidor WebSocket arrancado exitosamente.
+2025/10/24 15:59:41: Nueva conexión entrante: /10.60.0.128:18976
+2025/10/24 15:59:41: Jugador 0 (JUNAL) añadido.
+2025/10/24 15:59:41: Jugador 0 (JUNAL) se unió.
+2025/10/24 15:59:45: Jugador 0 inició el juego.
+2025/10/24 15:59:45: Iniciando el juego...
+2025/10/24 15:59:45: Mapa para el Nivel 1 cargado con 0 muros.
+2025/10/24 16:00:01: Jugador 0 eliminado.
+2025/10/24 16:00:01: Fin del juego. El único jugador ha sido eliminado.
+2025/10/24 16:00:03: Juego reiniciado por Jugador 0
+2025/10/24 16:00:03: Jugador 0 (JUNAL) añadido.
+2025/10/24 16:00:03: Juego reiniciado. Volviendo al lobby.
+2025/10/24 16:00:21: Nueva conexión entrante: /10.60.0.128:62738
+2025/10/24 16:00:21: Jugador 1 (JUNAL2) añadido.
+2025/10/24 16:00:21: Jugador 1 (JUNAL2) se unió.
+2025/10/24 16:00:24: Jugador 0 inició el juego.
+2025/10/24 16:00:24: Iniciando el juego...
+2025/10/24 16:00:24: Mapa para el Nivel 1 cargado con 0 muros.
+2025/10/24 16:00:32: Jugador 1 eliminado.
+2025/10/24 16:00:32: Cliente desconectado: Jugador 1
+2025/10/24 16:00:35: Jugador 0 eliminado.
+2025/10/24 16:00:35: Cliente desconectado: Jugador 0
+2025/10/24 16:00:47: Nueva conexión entrante: /10.60.0.128:43193
+2025/10/24 16:00:47: Jugador 2 (JUNAL) añadido.
+2025/10/24 16:00:47: Jugador 2 (JUNAL) se unió.
+2025/10/24 16:00:49: Jugador 2 eliminado.
+2025/10/24 16:00:49: Cliente desconectado: Jugador 2
+2025/10/24 16:01:01: Nueva conexión entrante: /10.60.0.128:14582
+2025/10/24 16:01:01: Jugador 3 (JUNAL) añadido.
+2025/10/24 16:01:01: Jugador 3 (JUNAL) se unió.
+2025/10/24 16:01:02: Nueva conexión entrante: /10.60.0.128:42661
+2025/10/24 16:01:02: Jugador 4 (ASDA) añadido.
+2025/10/24 16:01:02: Jugador 4 (ASDA) se unió.
+2025/10/24 16:01:05: Jugador 3 eliminado.
+2025/10/24 16:01:05: Cliente desconectado: Jugador 3
+2025/10/24 16:01:07: Jugador 4 eliminado.
+2025/10/24 16:01:07: Cliente desconectado: Jugador 4
+2025/10/24 16:01:10: Deteniendo el servidor WebSocket...
+2025/10/24 16:01:10: Bucle del juego detenido.
+2025/10/24 16:01:10: Servidor detenido.
+2025/10/24 16:01:13: Servidor WebSocket iniciado en el puerto 12345
+2025/10/24 16:01:13: Servidor WebSocket arrancado exitosamente.
+2025/10/24 16:01:27: Nueva conexión entrante: /10.60.0.128:2178
+2025/10/24 16:01:27: Jugador 0 (JUNAL) añadido.
+2025/10/24 16:01:27: Jugador 0 (JUNAL) se unió.
+2025/10/24 16:01:36: Nueva conexión entrante: /10.60.0.128:7952
+2025/10/24 16:01:36: Jugador 1 (LUIGGI) añadido.
+2025/10/24 16:01:36: Jugador 1 (LUIGGI) se unió.
+2025/10/24 16:01:43: Jugador 0 inició el juego.
+2025/10/24 16:01:43: Iniciando el juego...
+2025/10/24 16:01:43: Mapa para el Nivel 1 cargado con 0 muros.
+2025/10/24 16:02:01: Jugador 1 eliminado.
+2025/10/24 16:02:01: Fin del juego. Solo queda un jugador o ninguno.
+2025/10/24 16:02:03: Juego reiniciado por Jugador 0
+2025/10/24 16:02:03: Jugador 0 (JUNAL) añadido.
+2025/10/24 16:02:03: Jugador 1 (LUIGGI) añadido.
+2025/10/24 16:02:03: Juego reiniciado. Volviendo al lobby.
+2025/10/24 16:02:06: Jugador 0 inició el juego.
+2025/10/24 16:02:06: Iniciando el juego...
+2025/10/24 16:02:06: Mapa para el Nivel 1 cargado con 0 muros.
+2025/10/24 16:02:41: Jugador 1 eliminado.
+2025/10/24 16:02:41: Cliente desconectado: Jugador 1
+2025/10/24 16:02:42: Jugador 0 eliminado.
+2025/10/24 16:02:42: Cliente desconectado: Jugador 0
+2025/10/24 16:02:45: Deteniendo el servidor WebSocket...
+2025/10/24 16:02:45: Bucle del juego detenido.
+2025/10/24 16:02:45: Servidor detenido.

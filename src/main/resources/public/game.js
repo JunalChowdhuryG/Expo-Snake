@@ -1,149 +1,223 @@
-// --- Configuración del Canvas ---
+// --- Elementos de la UI ---
+const gameContainer = document.getElementById('gameContainer');
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-const TILE_SIZE = 16; // De GameState.java
-let ownPlayerId = -1;
-let gameObjects = [];
+const loginScreen = document.getElementById('loginScreen');
+const lobbyScreen = document.getElementById('lobbyScreen');
+const gameOverScreen = document.getElementById('gameOverScreen');
+
+const playerNameInput = document.getElementById('playerNameInput');
+const joinButton = document.getElementById('joinButton');
+const playerList = document.getElementById('playerList');
+const startButton = document.getElementById('startButton');
+const restartButton = document.getElementById('restartButton');
+
+// --- Estado del Juego (Cliente) ---
+const TILE_SIZE = 16;
+let myPlayerId = -1;
+let playerNames = {};
 let playerScores = {};
+let gameObjects = [];
 let isGameOver = false;
+let isGameInProgress = false;
+let ws; // WebSocket
 
-// --- Configuración del WebSocket ---
-// Obtiene la IP/host del navegador (ej. 192.168.1.12)
-// y se conecta al puerto WebSocket (12345)
-const ws = new WebSocket(`ws://${window.location.hostname}:12345`);
-
-ws.onopen = () => {
-    console.log('Conectado al servidor WebSocket');
-};
-
-ws.onmessage = (event) => {
-    const message = JSON.parse(event.data);
-
-    if (message.action === 'PLAYER_ID') {
-        ownPlayerId = message.playerId;
-        console.log('Mi ID de jugador es: ' + ownPlayerId);
+// --- Pantalla de Login (Inicio) ---
+joinButton.onclick = () => {
+    let playerName = playerNameInput.value.trim().toUpperCase();
+    if (playerName.length === 0) {
+        playerName = "PLAYER";
     }
-    else if (message.action === 'UPDATE_STATE') {
-        gameObjects = message.objects;
-        isGameOver = message.gameOver;
-        playerScores = message.playerScores;
+    // Trunca a 6 caracteres (aunque el input ya tiene maxlength)
+    playerName = playerName.substring(0, 6);
 
-        // Volver a dibujar el juego con los datos nuevos
-        renderGame();
-    }
+    // Conectar al servidor AHORA
+    connectWebSocket(playerName);
 };
 
-ws.onclose = () => {
-    console.log('Desconectado del servidor');
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = 'red';
-    ctx.font = '30px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('Desconectado del Servidor', canvas.width / 2, canvas.height / 2);
-};
+// --- Conexión WebSocket ---
+function connectWebSocket(playerName) {
+    // Obtiene la IP/host del navegador y se conecta al puerto WebSocket
+    ws = new WebSocket(`ws://${window.location.hostname}:12345`);
 
-// --- Función de Envío de Input ---
-function sendInput(input) {
-    // No enviar movimiento si el juego terminó (excepto RESTART)
-    if (isGameOver && input !== 'RESTART') return;
+    ws.onopen = () => {
+        console.log('Conectado al servidor WebSocket. Enviando datos de unión...');
+        // 1. Enviar mensaje de "unión" con el nombre
+        sendCommand("JOIN_GAME", { playerName: playerName });
+    };
 
+    ws.onmessage = (event) => {
+        const message = JSON.parse(event.data);
+
+        switch (message.action) {
+            case "PLAYER_ID":
+                // 2. El servidor nos da nuestro ID
+                myPlayerId = message.playerId;
+                console.log('Asignado Player ID: ' + myPlayerId);
+                // Ir al lobby
+                loginScreen.classList.add('hidden');
+                lobbyScreen.classList.remove('hidden');
+                break;
+
+            case "UPDATE_STATE":
+                // 3. Recibir actualización de estado (Lobby, Juego, o Fin)
+                gameObjects = message.objects;
+                isGameOver = message.gameOver;
+                isGameInProgress = message.gameInProgress;
+                playerNames = message.playerNames;
+                playerScores = message.playerScores;
+
+                // Actualizar la UI basado en el estado
+                updateUI();
+                break;
+        }
+    };
+
+    ws.onclose = () => {
+        console.log('Desconectado del servidor');
+        // Mostrar un error en la pantalla de login
+        loginScreen.classList.remove('hidden');
+        lobbyScreen.classList.add('hidden');
+        gameOverScreen.classList.add('hidden');
+        canvas.classList.add('hidden');
+        loginScreen.querySelector('h2').innerText = '¡Desconectado! Refresca la página.';
+        loginScreen.querySelector('h2').style.color = '#F44336';
+    };
+}
+
+// --- Envío de Comandos al Servidor ---
+function sendCommand(action, data = {}) {
     const message = {
-        action: 'PLAYER_INPUT',
-        input: input
+        action: action,
+        ...data // Añade datos (ej. playerName, input)
     };
     ws.send(JSON.stringify(message));
 }
 
+// --- Manejador Principal de UI ---
+function updateUI() {
+    // Ocultar canvas por defecto
+    canvas.style.display = "none";
+
+    if (isGameOver) {
+        // --- ESTADO 3: Fin del Juego ---
+        lobbyScreen.classList.add('hidden');
+        gameOverScreen.classList.remove('hidden');
+        // Mostrar el canvas detrás del overlay de Game Over
+        canvas.style.display = "block";
+        renderGame(); // Dibuja el estado final del juego
+    }
+    else if (isGameInProgress) {
+        // --- ESTADO 2: Juego en Progreso ---
+        loginScreen.classList.add('hidden');
+        lobbyScreen.classList.add('hidden');
+        gameOverScreen.classList.add('hidden');
+
+        // ¡Mostrar el canvas y dibujar el juego!
+        canvas.style.display = "block";
+        renderGame();
+    }
+    else {
+        // --- ESTADO 1: Lobby ---
+        loginScreen.classList.add('hidden');
+        gameOverScreen.classList.add('hidden');
+        lobbyScreen.classList.remove('hidden');
+
+        // Actualizar lista de jugadores en el lobby
+        playerList.innerHTML = ''; // Limpiar lista
+        Object.keys(playerNames).forEach(id => {
+            const li = document.createElement('li');
+            li.textContent = playerNames[id];
+            playerList.appendChild(li);
+        });
+
+        // Mostrar botón de "Start" SOLO al Host (Jugador 0)
+        if (myPlayerId === 0) {
+            startButton.classList.remove('hidden');
+        } else {
+            startButton.classList.add('hidden');
+        }
+    }
+}
+
+// --- Botones del Lobby y Game Over ---
+startButton.onclick = () => {
+    sendCommand("START_GAME");
+};
+
+restartButton.onclick = () => {
+    sendCommand("RESTART_GAME");
+};
+
 // --- CONTROLES DE TECLADO (Para Laptops) ---
 document.addEventListener('keydown', (e) => {
-    // Evita que las flechas muevan la página web
     if (e.key.startsWith("Arrow") || e.key === "Enter") {
         e.preventDefault();
     }
 
+    // Si el juego no está en marcha, no enviar inputs de movimiento
+    if (!isGameInProgress || isGameOver) {
+        // Permitir "Enter" para reiniciar desde el teclado
+        if (isGameOver && e.key === "Enter") {
+            sendCommand("RESTART_GAME");
+        }
+        return;
+    }
+
     switch (e.key) {
-        case 'ArrowUp': sendInput('UP'); break;
-        case 'ArrowDown': sendInput('DOWN'); break;
-        case 'ArrowLeft': sendInput('LEFT'); break;
-        case 'ArrowRight': sendInput('RIGHT'); break;
-        case 'Enter':
-            if (isGameOver) sendInput('RESTART');
-            break;
+        case 'ArrowUp': sendCommand("PLAYER_INPUT", { input: "UP" }); break;
+        case 'ArrowDown': sendCommand("PLAYER_INPUT", { input: "DOWN" }); break;
+        case 'ArrowLeft': sendCommand("PLAYER_INPUT", { input: "LEFT" }); break;
+        case 'ArrowRight': sendCommand("PLAYER_INPUT", { input: "RIGHT" }); break;
     }
 });
 
 // --- ¡NUEVO! CONTROLES TÁCTILES (Para Móviles) ---
 
-let touchStartX = 0;
-let touchStartY = 0;
-let touchEndX = 0;
-let touchEndY = 0;
-
-// Evita que el navegador haga "scroll" o "zoom"
-canvas.addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    touchStartX = e.changedTouches[0].screenX;
-    touchStartY = e.changedTouches[0].screenY;
-}, { passive: false });
-
-canvas.addEventListener('touchmove', (e) => {
-    e.preventDefault();
-}, { passive: false });
-
+let touchStartX = 0, touchStartY = 0;
+canvas.addEventListener('touchstart', (e) => { e.preventDefault(); touchStartX = e.changedTouches[0].screenX; touchStartY = e.changedTouches[0].screenY; }, { passive: false });
+canvas.addEventListener('touchmove', (e) => { e.preventDefault(); }, { passive: false });
 canvas.addEventListener('touchend', (e) => {
     e.preventDefault();
-    touchEndX = e.changedTouches[0].screenX;
-    touchEndY = e.changedTouches[0].screenY;
-    handleSwipe();
+
+    // Si el juego no está en marcha, no hacer nada
+    if (!isGameInProgress || isGameOver) return;
+
+    let touchEndX = e.changedTouches[0].screenX;
+    let touchEndY = e.changedTouches[0].screenY;
+    handleSwipe(touchEndX - touchStartX, touchEndY - touchStartY);
 }, { passive: false });
 
-function handleSwipe() {
-    const deltaX = touchEndX - touchStartX;
-    const deltaY = touchEndY - touchStartY;
-    const minSwipeDistance = 50; // Mínimo de 50px para contar como swipe
 
-    // Comprobar si el swipe fue más horizontal que vertical
+
+function handleSwipe(deltaX, deltaY) {
+    const minSwipeDistance = 40; // Menos distancia para más sensibilidad
+
     if (Math.abs(deltaX) > Math.abs(deltaY)) {
-        if (deltaX > minSwipeDistance) {
-            sendInput('RIGHT');
-        } else if (deltaX < -minSwipeDistance) {
-            sendInput('LEFT');
-        }
-    }
-    // Fue más vertical
-    else {
-        if (deltaY > minSwipeDistance) {
-            sendInput('DOWN');
-        } else if (deltaY < -minSwipeDistance) {
-            sendInput('UP');
-        }
-    }
-
-    // Si el usuario toca "Enter" en el teclado virtual (ej. en Game Over)
-    if (isGameOver && deltaX === 0 && deltaY === 0) {
-        sendInput('RESTART');
+        if (deltaX > minSwipeDistance) sendCommand("PLAYER_INPUT", { input: "RIGHT" });
+        else if (deltaX < -minSwipeDistance) sendCommand("PLAYER_INPUT", { input: "LEFT" });
+    } else {
+        if (deltaY > minSwipeDistance) sendCommand("PLAYER_INPUT", { input: "DOWN" });
+        else if (deltaY < -minSwipeDistance) sendCommand("PLAYER_INPUT", { input: "UP" });
     }
 }
-
 
 // --- LÓGICA DE RENDERIZADO (Reemplazo de GameRenderer.java) ---
 
 function renderGame() {
-    // Limpiar pantalla
     ctx.fillStyle = 'black';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Dibujar objetos
     if (gameObjects) {
         for (const obj of gameObjects) {
+            const isOwnSnake = (obj.playerId === myPlayerId);
             switch (obj.type) {
                 case 'SNAKE_HEAD':
-                    drawSnakeSegment(obj, true);
+                    drawSnakeSegment(obj, true, isOwnSnake);
                     break;
                 case 'SNAKE_BODY':
-                    drawSnakeSegment(obj, false);
+                    drawSnakeSegment(obj, false, isOwnSnake);
                     break;
                 case 'FRUIT':
                     drawFruit(obj);
@@ -154,12 +228,8 @@ function renderGame() {
             }
         }
     }
-
-    drawScoreboard(playerScores || {}, ownPlayerId);
-
-    if (isGameOver) {
-        drawGameOver();
-    }
+    // Pasar los nombres de los jugadores al scoreboard
+    drawScoreboard(playerScores || {}, playerNames || {}, myPlayerId);
 }
 
 function parseColor(colorName) {
@@ -167,11 +237,20 @@ function parseColor(colorName) {
     return colorName.toLowerCase();
 }
 
-function drawSnakeSegment(segment, isHead) {
+function drawSnakeSegment(segment, isHead, isOwnSnake) {
     ctx.fillStyle = parseColor(segment.color);
     ctx.fillRect(segment.x, segment.y, segment.width, segment.height);
-    ctx.strokeStyle = 'darkgray';
+
+    // --- ¡NUEVO! Identificador de Jugador ---
+    if (isOwnSnake) {
+        ctx.strokeStyle = 'yellow'; // Borde amarillo brillante
+        ctx.lineWidth = 2;
+    } else {
+        ctx.strokeStyle = 'darkgray';
+        ctx.lineWidth = 1;
+    }
     ctx.strokeRect(segment.x, segment.y, segment.width, segment.height);
+    // --- FIN NUEVO ---
 
     if (isHead) {
         ctx.fillStyle = 'black';
@@ -202,9 +281,9 @@ function drawWall(wall) {
     ctx.fillRect(wall.x, wall.y, wall.width, wall.height);
 }
 
-function drawScoreboard(scores, ownId) {
+function drawScoreboard(scores, names, ownId) {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-    ctx.fillRect(5, 5, 120, 20 + (Object.keys(scores).length * 15));
+    ctx.fillRect(5, 5, 130, 20 + (Object.keys(scores).length * 15));
 
     ctx.fillStyle = 'white';
     ctx.font = 'bold 14px Arial';
@@ -218,8 +297,11 @@ function drawScoreboard(scores, ownId) {
 
     for (const [id, score] of sortedScores) {
         let idNum = parseInt(id, 10);
+        // --- ¡NUEVO! Mostrar Nombre ---
+        let name = names[idNum] || 'Player ' + idNum;
+
         ctx.fillStyle = (idNum === ownId) ? 'yellow' : 'white';
-        ctx.fillText(`Player ${id}: ${score}`, 10, y);
+        ctx.fillText(`${name}: ${score}`, 10, y);
         y += 15;
     }
 }

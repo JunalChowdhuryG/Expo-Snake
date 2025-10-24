@@ -11,7 +11,7 @@ public class GameState {
     public static final int BOARD_WIDTH = TILE_SIZE * COLUMNS;
     public static final int BOARD_HEIGHT = TILE_SIZE * ROWS;
 
-    // Estructuras de datos para el estado del juego Snake
+    // --- Estructuras de Datos (sin cambios) ---
     private final Map<Integer, List<GameObject>> snakes = new ConcurrentHashMap<>();
     private final Map<Integer, String> snakeDirections = new ConcurrentHashMap<>();
     private final Map<Integer, Boolean> playerAliveStatus = new ConcurrentHashMap<>();
@@ -19,26 +19,27 @@ public class GameState {
     private final Map<Integer, Integer> snakeGrowthCounters = new ConcurrentHashMap<>();
     private final List<GameObject> fruits = Collections.synchronizedList(new ArrayList<>());
     private final List<GameObject> walls = Collections.synchronizedList(new ArrayList<>());
+    private final Map<Integer, String> playerNames = new ConcurrentHashMap<>();
+    private volatile boolean gameInProgress = false;
 
     private int currentLevel = 1;
     private boolean levelChanged = false;
-    private static final int MAX_LEVEL = 5;
-
+    private static final int MAX_LEVEL = 5; // Puedes subir esto si quieres más niveles de velocidad
     private boolean gameOver = false;
     private final Random random = new Random();
     private final Object gameStateLock = new Object();
 
     public GameState() {
-        spawnInitialFruits(5); // Iniciar con 5 frutas en el tablero
-        loadLevelMap(1);
+        // No generes frutas ni mapa hasta que el juego comience
+        //loadLevelMap(1); // Carga los muros (si el nivel 1 tuviera)
     }
 
+    // --- Lógica de Frutas (sin cambios) ---
     private void spawnInitialFruits(int numberOfFruits) {
         for (int i = 0; i < numberOfFruits; i++) {
             spawnFruit();
         }
     }
-
     private void spawnFruit() {
         synchronized (gameStateLock) {
             int x, y;
@@ -66,6 +67,15 @@ public class GameState {
                         }
                     }
                 }
+                // Evitar muros
+                if (!positionOccupied) {
+                    for (GameObject wall : walls) {
+                        if (wall.getX() == x && wall.getY() == y) {
+                            positionOccupied = true;
+                            break;
+                        }
+                    }
+                }
             } while (positionOccupied);
 
             int fruitValue = random.nextInt(9) + 1; // Frutas con valor de 1 a 9
@@ -75,9 +85,9 @@ public class GameState {
         }
     }
 
-    public void addPlayer(int playerId) {
+    // --- Lógica de Jugadores (ACTUALIZADA) ---
+    public void addPlayer(int playerId, String playerName) {
         synchronized (gameStateLock) {
-            // Crear una nueva serpiente para el jugador
             int startX = (random.nextInt(COLUMNS / 2) + COLUMNS / 4) * TILE_SIZE;
             int startY = (random.nextInt(ROWS / 2) + ROWS / 4) * TILE_SIZE;
 
@@ -88,20 +98,23 @@ public class GameState {
             snake.add(new GameObject(startX - TILE_SIZE, startY, TILE_SIZE, TILE_SIZE, "SNAKE_BODY", playerId));
 
             snakes.put(playerId, snake);
-            snakeDirections.put(playerId, "RIGHT"); // Dirección inicial
+            snakeDirections.put(playerId, "RIGHT");
             playerAliveStatus.put(playerId, true);
             playerScores.putIfAbsent(playerId, 0);
-            snakeGrowthCounters.put(playerId, 2); // Crecimiento inicial de 2 segmentos
+            snakeGrowthCounters.put(playerId, 2);
+
+            // Guardar nombre
+            playerNames.put(playerId, playerName);
 
             if (gameOver) {
                 gameOver = false;
             }
-            ServerLogger.log("Jugador " + playerId + " añadido.");
+            ServerLogger.log("Jugador " + playerId + " (" + playerName + ") añadido.");
         }
     }
 
     private String getRandomColor() {
-        String[] colors = {"CYAN", "MAGENTA", "YELLOW", "ORANGE", "PINK", "GREEN"};
+        String[] colors = {"CYAN", "MAGENTA", "YELLOW", "ORANGE", "PINK", "GREEN", "BLUE", "RED", "WHITE"};
         return colors[random.nextInt(colors.length)];
     }
 
@@ -112,6 +125,7 @@ public class GameState {
             playerAliveStatus.remove(playerId);
             playerScores.remove(playerId);
             snakeGrowthCounters.remove(playerId);
+            playerNames.remove(playerId); // Limpiar nombre
             ServerLogger.log("Jugador " + playerId + " eliminado.");
             checkGameOver();
         }
@@ -120,9 +134,8 @@ public class GameState {
     public void handleInput(int playerId, String input) {
         synchronized (gameStateLock) {
             if (!playerAliveStatus.getOrDefault(playerId, false)) {
-                if (input.equals("RESTART")) {
-                    resetGame();
-                }
+                // Si está muerto, no puede mover la serpiente
+                // (La lógica de RESTART está en GameServer)
                 return;
             }
 
@@ -139,16 +152,20 @@ public class GameState {
         }
     }
 
+    // --- Bucle del Juego (CORREGIDO) ---
     public void update() {
         synchronized (gameStateLock) {
-            if (gameOver) {
+            // ¡IMPORTANTE! No hacer nada si el juego no ha comenzado o terminó
+            if (gameOver || !gameInProgress) {
                 return;
             }
             if (snakes.isEmpty() && !playerAliveStatus.isEmpty()) {
-                 checkGameOver();
-                 return;
+                checkGameOver();
+                return;
             }
 
+            // --- INICIO DE LA LÓGICA DE ACTUALIZACIÓN ---
+            // (Este era el código que faltaba)
 
             // Mover cada serpiente
             for (Integer playerId : snakes.keySet()) {
@@ -213,8 +230,11 @@ public class GameState {
             }
             checkGameOver();
             checkLevelUp();
+            // --- FIN DE LA LÓGICA DE ACTUALIZACIÓN ---
         }
     }
+
+    // --- Lógica de Colisión y Niveles (Sin cambios) ---
 
     private boolean detectCollision(int x, int y, int playerId) {
         // Colisión con los bordes del tablero (solo a partir del nivel 2)
@@ -235,7 +255,7 @@ public class GameState {
                 GameObject segment = snake.get(i);
                 if (segment.getX() == x && segment.getY() == y) {
                     if (entry.getKey().equals(playerId) && i == snake.size() - 1) {
-                         // Es la punta de la cola propia, que se moverá, así que no es colisión
+                        // Es la punta de la cola propia, que se moverá, así que no es colisión
                         continue;
                     }
                     return true;
@@ -247,7 +267,7 @@ public class GameState {
 
     private void eliminatePlayer(int playerId) {
         playerAliveStatus.put(playerId, false);
-        snakes.remove(playerId);
+        snakes.remove(playerId); // Eliminar la serpiente del tablero
         ServerLogger.log("Jugador " + playerId + " eliminado.");
     }
 
@@ -267,18 +287,24 @@ public class GameState {
     }
 
     private void checkLevelUp() {
+        // El nivel máximo ahora solo limita la velocidad
         if (currentLevel >= MAX_LEVEL) {
             return;
         }
         int totalScore = playerScores.values().stream().mapToInt(Integer::intValue).sum();
-        int scoreThreshold = currentLevel * 50; // Siguiente nivel cada 50 puntos de score total
+        int scoreThreshold = currentLevel * 50; // Siguiente nivel cada 50 puntos
 
         if (totalScore >= scoreThreshold) {
             currentLevel++;
-            levelChanged = true;
-            ServerLogger.log("Subiendo al Nivel " + currentLevel);
-            loadLevelMap(currentLevel);
-            spawnFruit();
+            levelChanged = true; // Avisa a GameServer para que acelere
+            ServerLogger.log("Subiendo a Nivel de Velocidad " + currentLevel);
+
+            // --- CAMBIO AQUÍ ---
+            // loadLevelMap(currentLevel); // <--- LÍNEA ELIMINADA
+            // Ya no cargamos un mapa nuevo.
+            // --- FIN DEL CAMBIO ---
+
+            spawnFruit(); // Añadimos una fruta extra por subir de nivel
         }
     }
 
@@ -298,55 +324,44 @@ public class GameState {
         walls.clear();
         switch (level) {
             case 1:
-                // Nivel 1: Sin muros
+                // Nivel 1: Sin muros (Wraparound)
                 break;
-            case 2:
-                // Nivel 2: Un borde simple
-                for (int i = 0; i < COLUMNS; i++) {
-                    walls.add(new GameObject(i * TILE_SIZE, 0, TILE_SIZE, TILE_SIZE, "WALL", -1));
-                    walls.add(new GameObject(i * TILE_SIZE, (ROWS - 1) * TILE_SIZE, TILE_SIZE, TILE_SIZE, "WALL", -1));
-                }
-                for (int i = 1; i < ROWS - 1; i++) {
-                    walls.add(new GameObject(0, i * TILE_SIZE, TILE_SIZE, TILE_SIZE, "WALL", -1));
-                    walls.add(new GameObject((COLUMNS - 1) * TILE_SIZE, i * TILE_SIZE, TILE_SIZE, TILE_SIZE, "WALL", -1));
-                }
-                break;
-            case 3:
-                // Nivel 3: Dos barreras verticales
-                for (int i = 0; i < ROWS / 2 - 2; i++) {
-                    walls.add(new GameObject(COLUMNS / 3 * TILE_SIZE, (ROWS / 4 + i) * TILE_SIZE, TILE_SIZE, TILE_SIZE, "WALL", -1));
-                    walls.add(new GameObject(COLUMNS * 2 / 3 * TILE_SIZE, (ROWS / 4 + i) * TILE_SIZE, TILE_SIZE, TILE_SIZE, "WALL", -1));
-                }
-                break;
-            case 4:
-                // Nivel 4: Un laberinto simple
-                for (int i = 5; i < COLUMNS - 5; i++) {
-                    walls.add(new GameObject(i * TILE_SIZE, 5 * TILE_SIZE, TILE_SIZE, TILE_SIZE, "WALL", -1));
-                    walls.add(new GameObject(i * TILE_SIZE, (ROWS - 6) * TILE_SIZE, TILE_SIZE, TILE_SIZE, "WALL", -1));
-                }
-                break;
-            case 5:
-                // Nivel 5: Cajas concéntricas
-                for (int i = 3; i < COLUMNS - 3; i++) {
-                    walls.add(new GameObject(i * TILE_SIZE, 3 * TILE_SIZE, TILE_SIZE, TILE_SIZE, "WALL", -1));
-                    walls.add(new GameObject(i * TILE_SIZE, (ROWS - 4) * TILE_SIZE, TILE_SIZE, TILE_SIZE, "WALL", -1));
-                }
-                for (int i = 4; i < ROWS - 4; i++) {
-                    walls.add(new GameObject(3 * TILE_SIZE, i * TILE_SIZE, TILE_SIZE, TILE_SIZE, "WALL", -1));
-                    walls.add(new GameObject((COLUMNS - 4) * TILE_SIZE, i * TILE_SIZE, TILE_SIZE, TILE_SIZE, "WALL", -1));
-                }
-                 for (int i = 8; i < COLUMNS - 8; i++) {
-                    walls.add(new GameObject(i * TILE_SIZE, 8 * TILE_SIZE, TILE_SIZE, TILE_SIZE, "WALL", -1));
-                    walls.add(new GameObject(i * TILE_SIZE, (ROWS - 9) * TILE_SIZE, TILE_SIZE, TILE_SIZE, "WALL", -1));
-                }
+            default:
+                // Si por algún error subimos de nivel, no hacemos nada
                 break;
         }
         ServerLogger.log("Mapa para el Nivel " + level + " cargado con " + walls.size() + " muros.");
     }
 
+    // --- NUEVAS FUNCIONES DE ESTADO ---
+    public void startGame() {
+        synchronized (gameStateLock) {
+            if (gameInProgress) return; // No empezar si ya empezó
+
+            ServerLogger.log("Iniciando el juego...");
+            gameInProgress = true;
+            gameOver = false;
+            currentLevel = 1;
+            levelChanged = false;
+
+            // Cargar mapa y frutas AHORA
+            // (Asegúrate de que los jugadores existentes no tengan puntajes)
+            for (Integer playerId : playerScores.keySet()) {
+                playerScores.put(playerId, 0);
+                snakeGrowthCounters.put(playerId, 2);
+                playerAliveStatus.put(playerId, true);
+            }
+
+            loadLevelMap(1);
+            spawnInitialFruits(5 + playerNames.size()); // Más frutas si hay más jugadores
+        }
+    }
+
     public void resetGame() {
         synchronized (gameStateLock) {
             Set<Integer> playerIds = new HashSet<>(playerScores.keySet());
+            Map<Integer, String> names = new HashMap<>(playerNames); // Guardar nombres
+
             snakes.clear();
             snakeDirections.clear();
             playerAliveStatus.clear();
@@ -354,27 +369,37 @@ public class GameState {
             snakeGrowthCounters.clear();
             fruits.clear();
             walls.clear();
+            playerNames.clear(); // Limpiar nombres
 
-            spawnInitialFruits(5);
-            loadLevelMap(1);
-            for (int id : playerIds) {
-                addPlayer(id);
-            }
+            // --- Resetear Banderas ---
+            gameInProgress = false; // Volver al Lobby
             gameOver = false;
             currentLevel = 1;
             levelChanged = false;
-            ServerLogger.log("Juego reiniciado.");
+
+            // Re-añadir jugadores (para que estén listos para la siguiente ronda)
+            for (int id : playerIds) {
+                addPlayer(id, names.getOrDefault(id, "Player " + id));
+            }
+
+            ServerLogger.log("Juego reiniciado. Volviendo al lobby.");
         }
     }
+
+    // --- Getters (ACTUALIZADOS) ---
 
     public ArrayList<GameObject> getGameObjects() {
         synchronized (gameStateLock) {
             ArrayList<GameObject> objects = new ArrayList<>();
-            for (List<GameObject> snake : snakes.values()) {
-                objects.addAll(snake);
+            // Solo mostrar objetos si el juego está en marcha O terminado
+            // (pero no en el lobby)
+            if (gameInProgress || gameOver) {
+                for (List<GameObject> snake : snakes.values()) {
+                    objects.addAll(snake);
+                }
+                objects.addAll(fruits);
+                objects.addAll(walls);
             }
-            objects.addAll(fruits);
-            objects.addAll(walls);
             return objects;
         }
     }
@@ -385,7 +410,19 @@ public class GameState {
         }
     }
 
+    // Nuevo getter para nombres
+    public Map<Integer, String> getPlayerNames() {
+        synchronized (gameStateLock) {
+            return new HashMap<>(playerNames);
+        }
+    }
+
     public boolean isGameOver() {
         return gameOver;
+    }
+
+    // Nuevo getter para el estado del juego
+    public boolean isGameInProgress() {
+        return gameInProgress;
     }
 }
