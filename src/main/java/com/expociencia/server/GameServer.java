@@ -1,4 +1,5 @@
 package com.expociencia.server;
+
 import java.net.*;
 import java.util.*;
 import java.io.*;
@@ -30,7 +31,6 @@ public class GameServer extends WebSocketServer {
         gameState = new GameState();
         ServerLogger.log("Servidor WebSocket iniciado en el puerto " + port);
     }
-
 
     @Override
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
@@ -72,7 +72,7 @@ public class GameServer extends WebSocketServer {
                             playerName = playerName.substring(0, 6);
                         }
 
-                        gameState.addPlayer(newPlayerId, playerName);
+                        gameState.addPlayer(newPlayerId);
 
                         // Enviar al jugador su ID
                         Message idMessage = new Message("PLAYER_ID");
@@ -158,7 +158,8 @@ public class GameServer extends WebSocketServer {
     }
 
     private void broadcastState() {
-        if (playerConnections.isEmpty()) return;
+        if (playerConnections.isEmpty())
+            return;
 
         Message message = new Message("UPDATE_STATE");
         message.setObjects(gameState.getGameObjects());
@@ -204,7 +205,6 @@ public class GameServer extends WebSocketServer {
         }
     }
 
-
     // --- PUNTO DE ENTRADA (MAIN) ---
 
     public static void main(String[] args) {
@@ -224,12 +224,9 @@ public class GameServer extends WebSocketServer {
             // 2. Iniciar el servidor HTTP para los archivos web
             HttpServer httpServer = HttpServer.create(new InetSocketAddress(httpPort), 0);
 
-            httpServer.createContext("/", exchange ->
-                    serveFile(exchange, "/public/index.html", "text/html")
-            );
-            httpServer.createContext("/game.js", exchange ->
-                    serveFile(exchange, "/public/game.js", "application/javascript")
-            );
+            httpServer.createContext("/", exchange -> serveFile(exchange, "/public/index.html", "text/html"));
+            httpServer.createContext("/game.js",
+                    exchange -> serveFile(exchange, "/public/game.js", "application/javascript"));
 
             httpServer.setExecutor(null);
             httpServer.start();

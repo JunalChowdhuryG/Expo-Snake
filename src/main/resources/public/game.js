@@ -1,279 +1,116 @@
-// --- Elementos de la UI ---
-const gameContainer = document.getElementById('gameContainer');
+// --- Configuración del Canvas ---
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+const playerScoreEl = document.getElementById('player-score');
+const highScoreEl = document.getElementById('high-score');
+const muteButton = document.getElementById('mute-button');
+const volumeOnIcon = document.getElementById('volume-on');
+const volumeOffIcon = document.getElementById('volume-off');
 
-const loginScreen = document.getElementById('loginScreen');
-const lobbyScreen = document.getElementById('lobbyScreen');
-const gameOverScreen = document.getElementById('gameOverScreen');
-
-const playerNameInput = document.getElementById('playerNameInput');
-const joinButton = document.getElementById('joinButton');
-const playerList = document.getElementById('playerList');
-const startButton = document.getElementById('startButton');
-const restartButton = document.getElementById('restartButton');
-
-// --- Estado del Juego (Cliente) ---
 const TILE_SIZE = 16;
-let myPlayerId = -1;
-let playerNames = {};
-let playerScores = {};
+let ownPlayerId = -1;
 let gameObjects = [];
+let playerScores = {};
 let isGameOver = false;
-let isGameInProgress = false;
-let ws; // WebSocket
+let isMuted = false;
+let highScore = localStorage.getItem('snakeHighScore') || 0;
+highScoreEl.textContent = highScore;
 
-// --- Pantalla de Login (Inicio) ---
-joinButton.onclick = () => {
-    let playerName = playerNameInput.value.trim().toUpperCase();
-    if (playerName.length === 0) {
-        playerName = "PLAYER";
-    }
-    // Trunca a 6 caracteres (aunque el input ya tiene maxlength)
-    playerName = playerName.substring(0, 6);
+// --- Configuración del WebSocket ---
+const ws = new WebSocket(`ws://${window.location.hostname}:12345`);
 
-    // Conectar al servidor AHORA
-    connectWebSocket(playerName);
+ws.onopen = () => {
+    console.log('Conectado al servidor WebSocket');
 };
 
-// --- Conexión WebSocket ---
-function connectWebSocket(playerName) {
-    // Obtiene la IP/host del navegador y se conecta al puerto WebSocket
-    ws = new WebSocket(`ws://${window.location.hostname}:12345`);
+ws.onmessage = (event) => {
+    const message = JSON.parse(event.data);
 
-    ws.onopen = () => {
-        console.log('Conectado al servidor WebSocket. Enviando datos de unión...');
-        // 1. Enviar mensaje de "unión" con el nombre
-        sendCommand("JOIN_GAME", { playerName: playerName });
-    };
-
-    ws.onmessage = (event) => {
-        const message = JSON.parse(event.data);
-
-        switch (message.action) {
-            case "PLAYER_ID":
-                // 2. El servidor nos da nuestro ID
-                myPlayerId = message.playerId;
-                console.log('Asignado Player ID: ' + myPlayerId);
-                // Ir al lobby
-                loginScreen.classList.add('hidden');
-                lobbyScreen.classList.remove('hidden');
-                break;
-
-            case "UPDATE_STATE":
-                // 3. Recibir actualización de estado (Lobby, Juego, o Fin)
-                gameObjects = message.objects;
-                isGameOver = message.gameOver;
-                isGameInProgress = message.gameInProgress;
-                playerNames = message.playerNames;
-                playerScores = message.playerScores;
-
-                // Actualizar la UI basado en el estado
-                updateUI();
-                break;
-        }
-    };
-
-    ws.onclose = () => {
-        console.log('Desconectado del servidor');
-        // Mostrar un error en la pantalla de login
-        loginScreen.classList.remove('hidden');
-        lobbyScreen.classList.add('hidden');
-        gameOverScreen.classList.add('hidden');
-        canvas.classList.add('hidden');
-        loginScreen.querySelector('h2').innerText = '¡Desconectado! Refresca la página.';
-        loginScreen.querySelector('h2').style.color = '#F44336';
-    };
-}
-
-// --- Envío de Comandos al Servidor ---
-function sendCommand(action, data = {}) {
-    const message = {
-        action: action,
-        ...data // Añade datos (ej. playerName, input)
-    };
-    ws.send(JSON.stringify(message));
-}
-
-// --- Manejador Principal de UI ---
-function updateUI() {
-    // Ocultar canvas por defecto
-    canvas.style.display = "none";
-
-    if (isGameOver) {
-        // --- ESTADO 3: Fin del Juego ---
-        lobbyScreen.classList.add('hidden');
-        gameOverScreen.classList.remove('hidden');
-        // Mostrar el canvas detrás del overlay de Game Over
-        canvas.style.display = "block";
-        renderGame(); // Dibuja el estado final del juego
-    }
-    else if (isGameInProgress) {
-        // --- ESTADO 2: Juego en Progreso ---
-        loginScreen.classList.add('hidden');
-        lobbyScreen.classList.add('hidden');
-        gameOverScreen.classList.add('hidden');
-
-        // ¡Mostrar el canvas y dibujar el juego!
-        canvas.style.display = "block";
+    if (message.action === 'PLAYER_ID') {
+        ownPlayerId = message.playerId;
+    } else if (message.action === 'UPDATE_STATE') {
+        gameObjects = message.objects;
+        isGameOver = message.gameOver;
+        playerScores = message.playerScores;
         renderGame();
     }
-    else {
-        // --- ESTADO 1: Lobby ---
-        loginScreen.classList.add('hidden');
-        gameOverScreen.classList.add('hidden');
-        lobbyScreen.classList.remove('hidden');
+};
 
-        // Actualizar lista de jugadores en el lobby
-        playerList.innerHTML = ''; // Limpiar lista
-        Object.keys(playerNames).forEach(id => {
-            const li = document.createElement('li');
-            li.textContent = playerNames[id];
-            playerList.appendChild(li);
-        });
+ws.onclose = () => {
+    console.log('Desconectado del servidor');
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'red';
+    ctx.font = '30px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Desconectado del Servidor', canvas.width / 2, canvas.height / 2);
+};
 
-        // Mostrar botón de "Start" SOLO al Host (Jugador 0)
-        if (myPlayerId === 0) {
-            startButton.classList.remove('hidden');
-        } else {
-            startButton.classList.add('hidden');
-        }
-    }
+// --- Función de Envío de Input ---
+function sendInput(input) {
+    if (isGameOver && input !== 'RESTART') return;
+    ws.send(JSON.stringify({ action: 'PLAYER_INPUT', input: input }));
 }
 
-// --- Botones del Lobby y Game Over ---
-startButton.onclick = () => {
-    sendCommand("START_GAME");
-};
-
-restartButton.onclick = () => {
-    sendCommand("RESTART_GAME");
-};
-
-// --- CONTROLES DE TECLADO (Para Laptops) ---
+// --- CONTROLES ---
 document.addEventListener('keydown', (e) => {
-    if (e.key.startsWith("Arrow") || e.key === "Enter") {
-        e.preventDefault();
-    }
-
-    // Si el juego no está en marcha, no enviar inputs de movimiento
-    if (!isGameInProgress || isGameOver) {
-        // Permitir "Enter" para reiniciar desde el teclado
-        if (isGameOver && e.key === "Enter") {
-            sendCommand("RESTART_GAME");
-        }
-        return;
-    }
-
+    if (e.key.startsWith("Arrow") || e.key === "Enter") e.preventDefault();
     switch (e.key) {
-        case 'ArrowUp': sendCommand("PLAYER_INPUT", { input: "UP" }); break;
-        case 'ArrowDown': sendCommand("PLAYER_INPUT", { input: "DOWN" }); break;
-        case 'ArrowLeft': sendCommand("PLAYER_INPUT", { input: "LEFT" }); break;
-        case 'ArrowRight': sendCommand("PLAYER_INPUT", { input: "RIGHT" }); break;
+        case 'ArrowUp': sendInput('UP'); break;
+        case 'ArrowDown': sendInput('DOWN'); break;
+        case 'ArrowLeft': sendInput('LEFT'); break;
+        case 'ArrowRight': sendInput('RIGHT'); break;
+        case 'Enter': if (isGameOver) sendInput('RESTART'); break;
     }
 });
 
-// --- ¡NUEVO! CONTROLES TÁCTILES (Para Móviles) ---
-
-let touchStartX = 0, touchStartY = 0;
-canvas.addEventListener('touchstart', (e) => { e.preventDefault(); touchStartX = e.changedTouches[0].screenX; touchStartY = e.changedTouches[0].screenY; }, { passive: false });
-canvas.addEventListener('touchmove', (e) => { e.preventDefault(); }, { passive: false });
-canvas.addEventListener('touchend', (e) => {
+let touchStartX = 0;
+let touchStartY = 0;
+canvas.addEventListener('touchstart', e => { e.preventDefault(); touchStartX = e.changedTouches[0].screenX; touchStartY = e.changedTouches[0].screenY; }, { passive: false });
+canvas.addEventListener('touchend', e => {
     e.preventDefault();
-
-    // Si el juego no está en marcha, no hacer nada
-    if (!isGameInProgress || isGameOver) return;
-
-    let touchEndX = e.changedTouches[0].screenX;
-    let touchEndY = e.changedTouches[0].screenY;
-    handleSwipe(touchEndX - touchStartX, touchEndY - touchStartY);
+    const deltaX = e.changedTouches[0].screenX - touchStartX;
+    const deltaY = e.changedTouches[0].screenY - touchStartY;
+    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+        if (deltaX > 50) sendInput('RIGHT'); else if (deltaX < -50) sendInput('LEFT');
+    } else {
+        if (deltaY > 50) sendInput('DOWN'); else if (deltaY < -50) sendInput('UP');
+    }
+    if (isGameOver && deltaX === 0 && deltaY === 0) sendInput('RESTART');
 }, { passive: false });
 
+// --- MUTE ---
+muteButton.addEventListener('click', () => {
+    isMuted = !isMuted;
+    volumeOnIcon.style.display = isMuted ? 'none' : 'block';
+    volumeOffIcon.style.display = isMuted ? 'block' : 'none';
+    console.log(isMuted ? "Audio Muted" : "Audio Unmuted");
+});
 
-
-function handleSwipe(deltaX, deltaY) {
-    const minSwipeDistance = 40; // Menos distancia para más sensibilidad
-
-    if (Math.abs(deltaX) > Math.abs(deltaY)) {
-        if (deltaX > minSwipeDistance) sendCommand("PLAYER_INPUT", { input: "RIGHT" });
-        else if (deltaX < -minSwipeDistance) sendCommand("PLAYER_INPUT", { input: "LEFT" });
-    } else {
-        if (deltaY > minSwipeDistance) sendCommand("PLAYER_INPUT", { input: "DOWN" });
-        else if (deltaY < -minSwipeDistance) sendCommand("PLAYER_INPUT", { input: "UP" });
-    }
-}
-
-// --- LÓGICA DE RENDERIZADO (Reemplazo de GameRenderer.java) ---
-
+// --- LÓGICA DE RENDERIZADO ---
 function renderGame() {
-    ctx.fillStyle = 'black';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
+    drawBackground();
     if (gameObjects) {
         for (const obj of gameObjects) {
-            const isOwnSnake = (obj.playerId === myPlayerId);
             switch (obj.type) {
-                case 'SNAKE_HEAD':
-                    drawSnakeSegment(obj, true, isOwnSnake);
-                    break;
-                case 'SNAKE_BODY':
-                    drawSnakeSegment(obj, false, isOwnSnake);
-                    break;
-                case 'FRUIT':
-                    drawFruit(obj);
-                    break;
-                case 'WALL':
-                    drawWall(obj);
-                    break;
+                case 'SNAKE_HEAD': drawSnakeSegment(obj, true); break;
+                case 'SNAKE_BODY': drawSnakeSegment(obj, false); break;
+                case 'FRUIT': drawFruit(obj); break;
+                case 'WALL': drawWall(obj); break;
             }
         }
     }
-    // Pasar los nombres de los jugadores al scoreboard
-    drawScoreboard(playerScores || {}, playerNames || {}, myPlayerId);
+    updateScoreboard(playerScores || {}, ownPlayerId);
+    if (isGameOver) drawGameOver();
 }
 
-function parseColor(colorName) {
-    if (!colorName) return 'white';
-    return colorName.toLowerCase();
-}
-
-function drawSnakeSegment(segment, isHead, isOwnSnake) {
-    ctx.fillStyle = parseColor(segment.color);
-    ctx.fillRect(segment.x, segment.y, segment.width, segment.height);
-
-    // --- ¡NUEVO! Identificador de Jugador ---
-    if (isOwnSnake) {
-        ctx.strokeStyle = 'yellow'; // Borde amarillo brillante
-        ctx.lineWidth = 2;
-    } else {
-        ctx.strokeStyle = 'darkgray';
-        ctx.lineWidth = 1;
+function drawBackground() {
+    for (let x = 0; x < canvas.width / TILE_SIZE; x++) {
+        for (let y = 0; y < canvas.height / TILE_SIZE; y++) {
+            ctx.fillStyle = (x + y) % 2 === 0 ? '#AAD751' : '#A2D149';
+            ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+        }
     }
-    ctx.strokeRect(segment.x, segment.y, segment.width, segment.height);
-    // --- FIN NUEVO ---
-
-    if (isHead) {
-        ctx.fillStyle = 'black';
-        ctx.beginPath();
-        ctx.arc(segment.x + 5, segment.y + 5, 2, 0, 2 * Math.PI);
-        ctx.arc(segment.x + segment.width - 5, segment.y + 5, 2, 0, 2 * Math.PI);
-        ctx.fill();
-    }
-}
-
-function drawFruit(fruit) {
-    ctx.fillStyle = 'red';
-    ctx.beginPath();
-    // Dibuja un círculo para la fruta
-    ctx.arc(fruit.x + TILE_SIZE / 2, fruit.y + TILE_SIZE / 2, TILE_SIZE / 2, 0, 2 * Math.PI);
-    ctx.fill();
-
-    // Mostrar el valor de la fruta
-    ctx.fillStyle = 'white';
-    ctx.font = 'bold 12px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(fruit.health, fruit.x + TILE_SIZE / 2, fruit.y + TILE_SIZE / 2 + 1);
 }
 
 function drawWall(wall) {
@@ -281,41 +118,82 @@ function drawWall(wall) {
     ctx.fillRect(wall.x, wall.y, wall.width, wall.height);
 }
 
-function drawScoreboard(scores, names, ownId) {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-    ctx.fillRect(5, 5, 130, 20 + (Object.keys(scores).length * 15));
+function drawSnakeSegment(segment, isHead) {
+    const x = segment.x;
+    const y = segment.y;
+    ctx.fillStyle = '#4A75C6';
+    ctx.strokeStyle = '#436AB3';
+    ctx.lineWidth = 2;
+    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+    ctx.strokeRect(x, y, TILE_SIZE, TILE_SIZE);
 
-    ctx.fillStyle = 'white';
-    ctx.font = 'bold 14px Arial';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText('Scores:', 10, 10);
+    if (isHead) {
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 10px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(segment.name, x + TILE_SIZE / 2, y - 5);
 
-    let y = 30;
-
-    const sortedScores = Object.entries(scores).sort((a, b) => b[1] - a[1]);
-
-    for (const [id, score] of sortedScores) {
-        let idNum = parseInt(id, 10);
-        // --- ¡NUEVO! Mostrar Nombre ---
-        let name = names[idNum] || 'Player ' + idNum;
-
-        ctx.fillStyle = (idNum === ownId) ? 'yellow' : 'white';
-        ctx.fillText(`${name}: ${score}`, 10, y);
-        y += 15;
+        ctx.beginPath();
+        ctx.arc(x + 4, y + 5, 2.5, 0, 2 * Math.PI);
+        ctx.arc(x + TILE_SIZE - 4, y + 5, 2.5, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.arc(x + 4, y + 5, 1, 0, 2 * Math.PI);
+        ctx.arc(x + TILE_SIZE - 4, y + 5, 1, 0, 2 * Math.PI);
+        ctx.fill();
     }
 }
 
-function drawGameOver() {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+function drawFruit(fruit) {
+    const x = fruit.x + TILE_SIZE / 2;
+    const y = fruit.y + TILE_SIZE / 2;
 
-    ctx.fillStyle = 'red';
-    ctx.font = '48px Arial';
+    switch (fruit.fruitType) {
+        case 'APPLE':
+            ctx.fillStyle = '#D9453B';
+            ctx.beginPath();
+            ctx.arc(x, y, TILE_SIZE / 2.2, 0, 2 * Math.PI);
+            ctx.fill();
+            break;
+        case 'PEAR':
+            ctx.fillStyle = '#D2E252';
+            ctx.beginPath();
+            ctx.moveTo(x, y - TILE_SIZE / 3);
+            ctx.arc(x, y, TILE_SIZE / 2.5, 0.8 * Math.PI, 0.2 * Math.PI, false);
+            ctx.closePath();
+            ctx.fill();
+            break;
+        case 'CHERRY':
+            ctx.fillStyle = '#C22323';
+            ctx.beginPath();
+            ctx.arc(x - 3, y, TILE_SIZE / 3, 0, 2 * Math.PI);
+            ctx.arc(x + 3, y, TILE_SIZE / 3, 0, 2 * Math.PI);
+            ctx.fill();
+            break;
+    }
+}
+
+function updateScoreboard(scores, ownId) {
+    const myScore = scores[ownId] || 0;
+    const currentMaxScore = Math.max(0, ...Object.values(scores));
+
+    if (currentMaxScore > highScore) {
+        highScore = currentMaxScore;
+        localStorage.setItem('snakeHighScore', highScore);
+    }
+
+    playerScoreEl.textContent = myScore;
+    highScoreEl.textContent = highScore;
+}
+
+function drawGameOver() {
+    ctx.fillStyle = 'rgba(170, 215, 81, 0.8)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 48px Arial';
     ctx.textAlign = 'center';
     ctx.fillText('Game Over', canvas.width / 2, canvas.height / 2 - 20);
-
-    ctx.fillStyle = 'white';
-    ctx.font = '20px Arial';
-    ctx.fillText('Press ENTER or TAP to play again', canvas.width / 2, canvas.height / 2 + 30);
+    ctx.font = '24px Arial';
+    ctx.fillText('Tap to play again', canvas.width / 2, canvas.height / 2 + 30);
 }

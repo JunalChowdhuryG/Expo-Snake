@@ -1,178 +1,109 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Snake-Snakes</title>
+    <title>Snake</title>
     <style>
+        :root {
+            --game-container-width: 95vmin;
+            --header-height: 8vmin;
+            --header-bg: #4A752C;
+            --game-bg: #AAD751;
+            --grid-bg-dark: #A2D149;
+            --font-color: #FFFFFF;
+        }
+
         body {
-            background-color: #222; /* Fondo más oscuro */
+            background-color: #333;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
             margin: 0;
-            overflow: hidden;
             font-family: 'Arial', sans-serif;
-            color: white;
+            overflow: hidden;
         }
 
-        /* El contenedor principal posiciona el canvas y las superposiciones */
-        #gameContainer {
-            position: relative;
-            width: 95vmin;
-            height: 95vmin;
+        #game-container {
+            width: var(--game-container-width);
+            height: calc(var(--game-container-width) + var(--header-height));
+            display: flex;
+            flex-direction: column;
+        }
+
+        #header {
+            background-color: var(--header-bg);
+            height: var(--header-height);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 2vmin;
+            color: var(--font-color);
+            font-size: 4vmin;
+            font-weight: bold;
+        }
+
+        .score-item {
+            display: flex;
+            align-items: center;
+        }
+
+        .icon {
+            height: 4.5vmin;
+            width: 4.5vmin;
+            margin-right: 1.5vmin;
+            fill: white;
+        }
+
+        #mute-button {
+            cursor: pointer;
         }
 
         canvas {
-            background-color: #000;
-            border: 2px solid white;
+            background-color: var(--game-bg);
             width: 100%;
-            height: 100%;
+            height: var(--game-container-width);
+            /* Make it square */
             object-fit: contain;
             touch-action: none;
-            box-sizing: border-box; /* Incluye el borde en el tamaño */
         }
-
-        /* Contenedor para todas las pantallas superpuestas (Login, Lobby, Game Over) */
-        .ui-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.85); /* Fondo oscuro semi-transparente */
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
-            box-sizing: border-box;
-            padding: 20px;
-        }
-
-        /* Oculta un overlay */
-        .hidden {
-            display: none;
-        }
-
-        h1 {
-            color: #4CAF50; /* Verde Snake */
-            margin-top: 0;
-        }
-
-        h2 {
-            color: #FFC107; /* Amarillo */
-            margin-bottom: 20px;
-        }
-
-        /* Estilos para Inputs y Botones */
-        input[type="text"] {
-            padding: 12px;
-            font-size: 1.2rem;
-            text-align: center;
-            border: 2px solid #4CAF50;
-            background-color: #333;
-            color: white;
-            border-radius: 8px;
-            width: 80%;
-            max-width: 200px;
-            text-transform: uppercase;
-        }
-
-        button {
-            padding: 15px 30px;
-            font-size: 1.2rem;
-            font-weight: bold;
-            color: #222;
-            background-color: #4CAF50; /* Verde */
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            margin-top: 20px;
-            transition: background-color 0.2s, transform 0.1s;
-        }
-
-        button:hover {
-            background-color: #66BB6A;
-        }
-
-        button:active {
-            transform: scale(0.95);
-        }
-
-        /* Botón de "Peligro" (Rojo) */
-        button.danger {
-            background-color: #F44336; /* Rojo */
-        }
-        button.danger:hover {
-            background-color: #E57373;
-        }
-
-        /* --- Estilos del Lobby --- */
-        #playerList {
-            list-style: none;
-            padding: 0;
-            width: 80%;
-            max-width: 300px;
-        }
-
-        #playerList li {
-            background-color: #333;
-            padding: 10px;
-            margin-bottom: 8px;
-            border-radius: 5px;
-            font-size: 1.1rem;
-            border-left: 5px solid #FFC107;
-        }
-
-        #playerList li:first-child {
-            border-left-color: #4CAF50; /* El Host es verde */
-            font-weight: bold;
-        }
-
-        #playerList li:first-child::after {
-            content: " (Host)";
-            color: #4CAF50;
-            font-size: 0.9rem;
-        }
-
     </style>
 </head>
+
 <body>
-<div id="gameContainer">
-    <!-- El Canvas del Juego -->
-    <canvas id="gameCanvas" width="640" height="640"></canvas>
-
-    <!-- PANTALLA 1: LOGIN -->
-    <div id="loginScreen" class="ui-overlay">
-        <h1>Snake-Snakes</h1>
-        <h2>¡Bienvenido!</h2>
-        <p>Escribe tu nombre (máx. 6 letras):</p>
-        <input type="text" id="playerNameInput" maxlength="6" placeholder="JUGADOR">
-        <button id="joinButton">Unirse al Juego</button>
+    <div id="game-container">
+        <div id="header">
+            <div class="score-item">
+                <svg class="icon" viewBox="0 0 24 24">
+                    <path
+                        d="M12,2A7,7 0 0,0 5,9C5,14.25 12,22 12,22C12,22 19,14.25 19,9A7,7 0 0,0 12,2M12,4.5A4.5,4.5 0 0,1 16.5,9C16.5,12.37 13.5,17.23 12,19.35C10.5,17.23 7.5,12.37 7.5,9A4.5,4.5 0 0,1 12,4.5M12,6.5A2.5,2.5 0 0,0 9.5,9A2.5,2.5 0 0,0 12,11.5A2.5,2.5 0 0,0 14.5,9A2.5,2.5 0 0,0 12,6.5Z" />
+                </svg>
+                <span id="player-score">0</span>
+            </div>
+            <div class="score-item">
+                <svg class="icon" viewBox="0 0 24 24">
+                    <path
+                        d="M19,2H5A3,3 0 0,0 2,5V19A3,3 0 0,0 5,22H19A3,3 0 0,0 22,19V5A3,3 0 0,0 19,2M19,20H5V8H19V20M12,12A4,4 0 0,1 16,16A4,4 0 0,1 12,20A4,4 0 0,1 8,16A4,4 0 0,1 12,12M12,14A2,2 0 0,0 10,16A2,2 0 0,0 12,18A2,2 0 0,0 14,16A2,2 0 0,0 12,14M18,6H6V4H18V6Z" />
+                </svg>
+                <span id="high-score">0</span>
+            </div>
+            <div id="mute-button">
+                <svg id="volume-on" class="icon" viewBox="0 0 24 24">
+                    <path
+                        d="M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,15.17 16.89,17.84 14,18.7V20.77C18,19.86 21,16.28 21,12C21,7.72 18,4.14 14,3.23M16.5,12C16.5,10.23 15.5,8.71 14,7.97V16C15.5,15.29 16.5,13.76 16.5,12M3,9V15H7L12,20V4L7,9H3Z" />
+                </svg>
+                <svg id="volume-off" class="icon" viewBox="0 0 24 24" style="display: none;">
+                    <path
+                        d="M12,4L7,9H3V15H7L12,20V4M16.5,12C16.5,10.23 15.5,8.71 14,7.97V10.18L16.45,12.63C16.5,12.43 16.5,12.21 16.5,12M19,12C19,12.94 18.8,13.82 18.46,14.64L19.97,16.15C20.62,14.91 21,13.5 21,12C21,7.72 18,4.14 14,3.23V5.29C16.89,6.15 19,8.83 19,12M4.27,3L3,4.27L7.73,9H3V15H7.73L12,19.73V13.27L16.25,17.52C15.58,17.84 14.83,18.09 14,18.22V20.29C15.34,20.06 16.54,19.5 17.5,18.73L19.73,21L21,19.73L4.27,3Z" />
+                </svg>
+            </div>
+        </div>
+        <canvas id="gameCanvas" width="640" height="640"></canvas>
     </div>
 
-    <!-- PANTALLA 2: LOBBY (SALA DE ESPERA) -->
-    <div id="lobbyScreen" class="ui-overlay hidden">
-        <h2>Sala de Espera</h2>
-        <p>Esperando a que el Host inicie el juego...</p>
-        <ul id="playerList">
-            <!-- Los jugadores se añadirán aquí con JS -->
-        </ul>
-        <!-- El Host (Jugador 0) verá este botón -->
-        <button id="startButton" class="hidden">¡Comenzar Juego!</button>
-    </div>
-
-    <!-- PANTALLA 3: FIN DEL JUEGO -->
-    <div id="gameOverScreen" class="ui-overlay hidden">
-        <h1 style="color: #F44336;">Game Over</h1>
-        <p>¡Buen intento!</p>
-        <button id="restartButton" class="danger">Volver al Lobby</button>
-    </div>
-</div>
-
-<script src="game.js"></script>
+    <script src="game.js"></script>
 </body>
-</html>
 
+</html>

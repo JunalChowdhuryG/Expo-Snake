@@ -1,4 +1,5 @@
 package com.expociencia.messages;
+
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -30,60 +31,78 @@ public class Message implements Serializable {
     }
 
     // --- Getters y Setters para todos los campos ---
-    // (Asegúrate de tenerlos para todos: action, objects, gameOver, input, playerId,
+    // (Asegúrate de tenerlos para todos: action, objects, gameOver, input,
+    // playerId,
     // playerName, playerScores, playerNames, gameInProgress)
 
     public String getAction() {
         return action;
     }
+
     public void setAction(String action) {
         this.action = action;
     }
+
     public ArrayList<GameObject> getObjects() {
         return objects;
     }
+
     public void setObjects(ArrayList<GameObject> objects) {
         this.objects = objects;
     }
+
     public boolean isGameOver() {
         return gameOver;
     }
+
     public void setGameOver(boolean gameOver) {
         this.gameOver = gameOver;
     }
+
     public String getInput() {
         return input;
     }
+
     public void setInput(String input) {
         this.input = input;
     }
+
     public int getPlayerId() {
         return playerId;
     }
+
     public void setPlayerId(int playerId) {
         this.playerId = playerId;
     }
+
     public String getPlayerName() {
         return playerName;
     }
+
     public void setPlayerName(String playerName) {
         this.playerName = playerName;
     }
+
     public Map<Integer, Integer> getPlayerScores() {
         return playerScores;
     }
+
     public void setPlayerScores(Map<Integer, Integer> playerScores) {
         this.playerScores = playerScores;
     }
+
     public Map<Integer, String> getPlayerNames() {
         return playerNames;
     }
+
     public void setPlayerNames(Map<Integer, String> playerNames) {
         this.playerNames = playerNames;
     }
+
     public boolean isGameInProgress() {
         return gameInProgress;
     }
+
     public void setGameInProgress(boolean gameInProgress) {
         this.gameInProgress = gameInProgress;
     }
