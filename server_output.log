@@ -80,3 +80,166 @@
 2025/10/24 16:02:45: Deteniendo el servidor WebSocket...
 2025/10/24 16:02:45: Bucle del juego detenido.
 2025/10/24 16:02:45: Servidor detenido.
+2025/10/27 16:52:15: Servidor WebSocket iniciado en el puerto 12345
+2025/10/27 16:52:15: Servidor WebSocket arrancado exitosamente.
+2025/10/27 16:53:11: Nueva conexión entrante: /[0:0:0:0:0:0:0:1]:49407
+2025/10/27 16:53:11 [ERROR]: Error procesando mensaje JSON: {"type":"join","playerName":"ssssss"}
+java.lang.NullPointerException: Cannot invoke "String.hashCode()" because "<local5>" is null
+	at com.expociencia.server.GameServer.onMessage(GameServer.java:60)
+	at org.java_websocket.server.WebSocketServer.onWebsocketMessage(WebSocketServer.java:763)
+	at org.java_websocket.drafts.Draft_6455.processFrameText(Draft_6455.java:986)
+	at org.java_websocket.drafts.Draft_6455.processFrame(Draft_6455.java:910)
+	at org.java_websocket.WebSocketImpl.decodeFrames(WebSocketImpl.java:397)
+	at org.java_websocket.WebSocketImpl.decode(WebSocketImpl.java:229)
+	at org.java_websocket.server.WebSocketServer$WebSocketWorker.doDecode(WebSocketServer.java:1165)
+	at org.java_websocket.server.WebSocketServer$WebSocketWorker.run(WebSocketServer.java:1137)
+2025/10/27 16:53:14: Nueva conexión entrante: /[0:0:0:0:0:0:0:1]:57580
+2025/10/27 16:53:14 [ERROR]: Error procesando mensaje JSON: {"type":"join","playerName":"ssssss"}
+java.lang.NullPointerException: Cannot invoke "String.hashCode()" because "<local5>" is null
+	at com.expociencia.server.GameServer.onMessage(GameServer.java:60)
+	at org.java_websocket.server.WebSocketServer.onWebsocketMessage(WebSocketServer.java:763)
+	at org.java_websocket.drafts.Draft_6455.processFrameText(Draft_6455.java:986)
+	at org.java_websocket.drafts.Draft_6455.processFrame(Draft_6455.java:910)
+	at org.java_websocket.WebSocketImpl.decodeFrames(WebSocketImpl.java:397)
+	at org.java_websocket.WebSocketImpl.decode(WebSocketImpl.java:229)
+	at org.java_websocket.server.WebSocketServer$WebSocketWorker.doDecode(WebSocketServer.java:1165)
+	at org.java_websocket.server.WebSocketServer$WebSocketWorker.run(WebSocketServer.java:1137)
+2025/10/27 16:53:14: Nueva conexión entrante: /[0:0:0:0:0:0:0:1]:65521
+2025/10/27 16:53:14 [ERROR]: Error procesando mensaje JSON: {"type":"join","playerName":"ssssss"}
+java.lang.NullPointerException: Cannot invoke "String.hashCode()" because "<local5>" is null
+	at com.expociencia.server.GameServer.onMessage(GameServer.java:60)
+	at org.java_websocket.server.WebSocketServer.onWebsocketMessage(WebSocketServer.java:763)
+	at org.java_websocket.drafts.Draft_6455.processFrameText(Draft_6455.java:986)
+	at org.java_websocket.drafts.Draft_6455.processFrame(Draft_6455.java:910)
+	at org.java_websocket.WebSocketImpl.decodeFrames(WebSocketImpl.java:397)
+	at org.java_websocket.WebSocketImpl.decode(WebSocketImpl.java:229)
+	at org.java_websocket.server.WebSocketServer$WebSocketWorker.doDecode(WebSocketServer.java:1165)
+	at org.java_websocket.server.WebSocketServer$WebSocketWorker.run(WebSocketServer.java:1137)
+2025/10/27 16:53:15: Nueva conexión entrante: /[0:0:0:0:0:0:0:1]:50390
+2025/10/27 16:53:15 [ERROR]: Error procesando mensaje JSON: {"type":"join","playerName":"ssssss"}
+java.lang.NullPointerException: Cannot invoke "String.hashCode()" because "<local5>" is null
+	at com.expociencia.server.GameServer.onMessage(GameServer.java:60)
+	at org.java_websocket.server.WebSocketServer.onWebsocketMessage(WebSocketServer.java:763)
+	at org.java_websocket.drafts.Draft_6455.processFrameText(Draft_6455.java:986)
+	at org.java_websocket.drafts.Draft_6455.processFrame(Draft_6455.java:910)
+	at org.java_websocket.WebSocketImpl.decodeFrames(WebSocketImpl.java:397)
+	at org.java_websocket.WebSocketImpl.decode(WebSocketImpl.java:229)
+	at org.java_websocket.server.WebSocketServer$WebSocketWorker.doDecode(WebSocketServer.java:1165)
+	at org.java_websocket.server.WebSocketServer$WebSocketWorker.run(WebSocketServer.java:1137)
+2025/10/27 16:53:15: Nueva conexión entrante: /[0:0:0:0:0:0:0:1]:61711
+2025/10/27 16:53:15 [ERROR]: Error procesando mensaje JSON: {"type":"join","playerName":"ssssss"}
+java.lang.NullPointerException: Cannot invoke "String.hashCode()" because "<local5>" is null
+	at com.expociencia.server.GameServer.onMessage(GameServer.java:60)
+	at org.java_websocket.server.WebSocketServer.onWebsocketMessage(WebSocketServer.java:763)
+	at org.java_websocket.drafts.Draft_6455.processFrameText(Draft_6455.java:986)
+	at org.java_websocket.drafts.Draft_6455.processFrame(Draft_6455.java:910)
+	at org.java_websocket.WebSocketImpl.decodeFrames(WebSocketImpl.java:397)
+	at org.java_websocket.WebSocketImpl.decode(WebSocketImpl.java:229)
+	at org.java_websocket.server.WebSocketServer$WebSocketWorker.doDecode(WebSocketServer.java:1165)
+	at org.java_websocket.server.WebSocketServer$WebSocketWorker.run(WebSocketServer.java:1137)
+2025/10/27 16:53:15: Nueva conexión entrante: /[0:0:0:0:0:0:0:1]:60684
+2025/10/27 16:53:15 [ERROR]: Error procesando mensaje JSON: {"type":"join","playerName":"ssssss"}
+java.lang.NullPointerException: Cannot invoke "String.hashCode()" because "<local5>" is null
+	at com.expociencia.server.GameServer.onMessage(GameServer.java:60)
+	at org.java_websocket.server.WebSocketServer.onWebsocketMessage(WebSocketServer.java:763)
+	at org.java_websocket.drafts.Draft_6455.processFrameText(Draft_6455.java:986)
+	at org.java_websocket.drafts.Draft_6455.processFrame(Draft_6455.java:910)
+	at org.java_websocket.WebSocketImpl.decodeFrames(WebSocketImpl.java:397)
+	at org.java_websocket.WebSocketImpl.decode(WebSocketImpl.java:229)
+	at org.java_websocket.server.WebSocketServer$WebSocketWorker.doDecode(WebSocketServer.java:1165)
+	at org.java_websocket.server.WebSocketServer$WebSocketWorker.run(WebSocketServer.java:1137)
+2025/10/27 16:53:15: Nueva conexión entrante: /[0:0:0:0:0:0:0:1]:52395
+2025/10/27 16:53:15 [ERROR]: Error procesando mensaje JSON: {"type":"join","playerName":"ssssss"}
+java.lang.NullPointerException: Cannot invoke "String.hashCode()" because "<local5>" is null
+	at com.expociencia.server.GameServer.onMessage(GameServer.java:60)
+	at org.java_websocket.server.WebSocketServer.onWebsocketMessage(WebSocketServer.java:763)
+	at org.java_websocket.drafts.Draft_6455.processFrameText(Draft_6455.java:986)
+	at org.java_websocket.drafts.Draft_6455.processFrame(Draft_6455.java:910)
+	at org.java_websocket.WebSocketImpl.decodeFrames(WebSocketImpl.java:397)
+	at org.java_websocket.WebSocketImpl.decode(WebSocketImpl.java:229)
+	at org.java_websocket.server.WebSocketServer$WebSocketWorker.doDecode(WebSocketServer.java:1165)
+	at org.java_websocket.server.WebSocketServer$WebSocketWorker.run(WebSocketServer.java:1137)
+2025/10/27 16:53:15: Nueva conexión entrante: /[0:0:0:0:0:0:0:1]:57468
+2025/10/27 16:53:15 [ERROR]: Error procesando mensaje JSON: {"type":"join","playerName":"ssssss"}
+java.lang.NullPointerException: Cannot invoke "String.hashCode()" because "<local5>" is null
+	at com.expociencia.server.GameServer.onMessage(GameServer.java:60)
+	at org.java_websocket.server.WebSocketServer.onWebsocketMessage(WebSocketServer.java:763)
+	at org.java_websocket.drafts.Draft_6455.processFrameText(Draft_6455.java:986)
+	at org.java_websocket.drafts.Draft_6455.processFrame(Draft_6455.java:910)
+	at org.java_websocket.WebSocketImpl.decodeFrames(WebSocketImpl.java:397)
+	at org.java_websocket.WebSocketImpl.decode(WebSocketImpl.java:229)
+	at org.java_websocket.server.WebSocketServer$WebSocketWorker.doDecode(WebSocketServer.java:1165)
+	at org.java_websocket.server.WebSocketServer$WebSocketWorker.run(WebSocketServer.java:1137)
+2025/10/27 16:53:15: Nueva conexión entrante: /[0:0:0:0:0:0:0:1]:60907
+2025/10/27 16:53:15 [ERROR]: Error procesando mensaje JSON: {"type":"join","playerName":"ssssss"}
+java.lang.NullPointerException: Cannot invoke "String.hashCode()" because "<local5>" is null
+	at com.expociencia.server.GameServer.onMessage(GameServer.java:60)
+	at org.java_websocket.server.WebSocketServer.onWebsocketMessage(WebSocketServer.java:763)
+	at org.java_websocket.drafts.Draft_6455.processFrameText(Draft_6455.java:986)
+	at org.java_websocket.drafts.Draft_6455.processFrame(Draft_6455.java:910)
+	at org.java_websocket.WebSocketImpl.decodeFrames(WebSocketImpl.java:397)
+	at org.java_websocket.WebSocketImpl.decode(WebSocketImpl.java:229)
+	at org.java_websocket.server.WebSocketServer$WebSocketWorker.doDecode(WebSocketServer.java:1165)
+	at org.java_websocket.server.WebSocketServer$WebSocketWorker.run(WebSocketServer.java:1137)
+2025/10/27 16:53:15: Nueva conexión entrante: /[0:0:0:0:0:0:0:1]:62662
+2025/10/27 16:53:15 [ERROR]: Error procesando mensaje JSON: {"type":"join","playerName":"ssssss"}
+java.lang.NullPointerException: Cannot invoke "String.hashCode()" because "<local5>" is null
+	at com.expociencia.server.GameServer.onMessage(GameServer.java:60)
+	at org.java_websocket.server.WebSocketServer.onWebsocketMessage(WebSocketServer.java:763)
+	at org.java_websocket.drafts.Draft_6455.processFrameText(Draft_6455.java:986)
+	at org.java_websocket.drafts.Draft_6455.processFrame(Draft_6455.java:910)
+	at org.java_websocket.WebSocketImpl.decodeFrames(WebSocketImpl.java:397)
+	at org.java_websocket.WebSocketImpl.decode(WebSocketImpl.java:229)
+	at org.java_websocket.server.WebSocketServer$WebSocketWorker.doDecode(WebSocketServer.java:1165)
+	at org.java_websocket.server.WebSocketServer$WebSocketWorker.run(WebSocketServer.java:1137)
+2025/10/27 16:55:18: Deteniendo el servidor WebSocket...
+2025/10/27 16:55:18: Bucle del juego detenido.
+2025/10/27 16:55:18: Conexión (no unida) cerrada: /[0:0:0:0:0:0:0:1]:57468
+2025/10/27 16:55:18: Conexión (no unida) cerrada: /[0:0:0:0:0:0:0:1]:60684
+2025/10/27 16:55:18: Conexión (no unida) cerrada: /[0:0:0:0:0:0:0:1]:62662
+2025/10/27 16:55:18: Conexión (no unida) cerrada: /[0:0:0:0:0:0:0:1]:57580
+2025/10/27 16:55:18: Conexión (no unida) cerrada: /[0:0:0:0:0:0:0:1]:61711
+2025/10/27 16:55:18: Conexión (no unida) cerrada: /[0:0:0:0:0:0:0:1]:52395
+2025/10/27 16:55:18: Conexión (no unida) cerrada: /[0:0:0:0:0:0:0:1]:50390
+2025/10/27 16:55:18: Conexión (no unida) cerrada: /[0:0:0:0:0:0:0:1]:65521
+2025/10/27 16:55:18: Conexión (no unida) cerrada: /[0:0:0:0:0:0:0:1]:49407
+2025/10/27 16:55:18: Conexión (no unida) cerrada: /[0:0:0:0:0:0:0:1]:60907
+2025/10/27 16:55:18: Servidor detenido.
+2025/10/27 16:55:31: Servidor WebSocket iniciado en el puerto 12345
+2025/10/27 16:55:31: Servidor WebSocket arrancado exitosamente.
+2025/10/27 16:55:43: Nueva conexión entrante: /[0:0:0:0:0:0:0:1]:61997
+2025/10/27 16:55:43: Jugador 0 (ssssss) añadido.
+2025/10/27 16:55:43: Jugador 0 (ssssss) se unió.
+2025/10/27 16:56:01: Jugador 0 eliminado.
+2025/10/27 16:56:01: Cliente desconectado: Jugador 0
+2025/10/27 16:56:06: Nueva conexión entrante: /[0:0:0:0:0:0:0:1]:53977
+2025/10/27 16:56:06: Jugador 1 (ssssss) añadido.
+2025/10/27 16:56:06: Jugador 1 (ssssss) se unió.
+2025/10/27 16:57:46: Deteniendo el servidor WebSocket...
+2025/10/27 16:57:46: Bucle del juego detenido.
+2025/10/27 16:57:46: Jugador 1 eliminado.
+2025/10/27 16:57:46: Cliente desconectado: Jugador 1
+2025/10/27 16:57:46: Servidor detenido.
+2025/10/27 16:57:47: Servidor WebSocket iniciado en el puerto 12345
+2025/10/27 16:57:47: Servidor WebSocket arrancado exitosamente.
+2025/10/27 16:57:47: Deteniendo el servidor WebSocket...
+2025/10/27 16:57:47: Bucle del juego detenido.
+2025/10/27 16:57:47: Servidor detenido.
+2025/10/27 16:57:56: Servidor WebSocket iniciado en el puerto 12345
+2025/10/27 16:57:56: Servidor WebSocket arrancado exitosamente.
+2025/10/27 16:58:03: Nueva conexión entrante: /[0:0:0:0:0:0:0:1]:53840
+2025/10/27 16:58:03: Jugador 0 (ssssss) añadido.
+2025/10/27 16:58:03: Jugador 0 (ssssss) se unió.
+2025/10/27 17:00:20 [ERROR]: Error en el bucle del juego: null
+org.java_websocket.exceptions.WebsocketNotConnectedException
+	at org.java_websocket.WebSocketImpl.send(WebSocketImpl.java:669)
+	at org.java_websocket.WebSocketImpl.send(WebSocketImpl.java:645)
+	at com.expociencia.server.GameServer.broadcastState(GameServer.java:176)
+	at com.expociencia.server.GameServer$1.run(GameServer.java:151)
+	at java.base/java.util.TimerThread.mainLoop(Timer.java:566)
+	at java.base/java.util.TimerThread.run(Timer.java:516)
+2025/10/27 17:00:20: Jugador 0 eliminado.
+2025/10/27 17:00:20: Cliente desconectado: Jugador 0
+2025/10/27 17:00:22: Nueva conexión entrante: /[0:0:0:0:0:0:0:1]:62124
+2025/10/27 17:00:22: Jugador 1 (ssssss) añadido.
+2025/10/27 17:00:22: Jugador 1 (ssssss) se unió.

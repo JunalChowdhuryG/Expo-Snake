@@ -32,7 +32,10 @@ class WebSocketService {
         this.socket.onmessage = (event) => {
           try {
             const message = JSON.parse(event.data);
-            this._notifyHandlers(message.type, message);
+            // El servidor usa 'action' en lugar de 'type'
+            const messageType = message.action || message.type;
+            this._notifyHandlers(messageType, message);
+            console.log('Mensaje recibido:', message);
           } catch (error) {
             console.error('Error al procesar mensaje:', error);
           }

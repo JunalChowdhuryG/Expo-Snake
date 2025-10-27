@@ -17,12 +17,12 @@ class GameService {
   }
 
   _setupWebSocketHandlers() {
-    webSocketService.on('update', this._handleUpdate.bind(this));
+    webSocketService.on('UPDATE_STATE', this._handleUpdate.bind(this));
     webSocketService.on('playerJoined', this._handlePlayerJoined.bind(this));
     webSocketService.on('playerLeft', this._handlePlayerLeft.bind(this));
     webSocketService.on('gameStarted', this._handleGameStarted.bind(this));
     webSocketService.on('gameOver', this._handleGameOver.bind(this));
-    webSocketService.on('assignId', this._handleAssignId.bind(this));
+    webSocketService.on('PLAYER_ID', this._handleAssignId.bind(this));
   }
 
   _notifyListeners() {
@@ -36,8 +36,11 @@ class GameService {
   }
 
   _handleUpdate(data) {
-    this.gameState.gameObjects = data.gameObjects || [];
-    this.gameState.playerScores = data.scores || {};
+    this.gameState.gameObjects = data.objects || [];
+    this.gameState.playerScores = data.playerScores || {};
+    this.gameState.playerNames = data.playerNames || {};
+    this.gameState.isGameOver = data.gameOver || false;
+    this.gameState.isGameInProgress = data.gameInProgress || false;
     this._notifyListeners();
   }
 
@@ -87,7 +90,7 @@ class GameService {
 
   joinGame(playerName) {
     webSocketService.send({
-      type: 'join',
+      action: 'JOIN_GAME',
       playerName
     });
   }
@@ -95,7 +98,7 @@ class GameService {
   startGame() {
     if (this.gameState.isHost) {
       webSocketService.send({
-        type: 'startGame'
+        action: 'START_GAME'
       });
     }
   }
