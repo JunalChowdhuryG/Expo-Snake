@@ -1,4 +1,5 @@
 package com.expociencia.server;
+
 import java.net.*;
 import java.util.*;
 import java.io.*;
@@ -30,7 +31,6 @@ public class GameServer extends WebSocketServer {
         gameState = new GameState();
         ServerLogger.log("Servidor WebSocket iniciado en el puerto " + port);
     }
-
 
     @Override
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
@@ -92,8 +92,8 @@ public class GameServer extends WebSocketServer {
 
                 case "START_GAME":
                     // Solo el primer jugador (ID 0) puede iniciar el juego
-                    if (playerId != null && playerId == 0 && !gameState.isGameInProgress()) {
-                        ServerLogger.log("Jugador 0 inició el juego.");
+                    if (playerId != null && !gameState.isGameInProgress()) {
+                        ServerLogger.log("Jugador " + playerId + " inició el juego.");
                         gameState.startGame();
                         broadcastState(); // Notificar a todos que el juego comenzó
                     }
@@ -158,22 +158,26 @@ public class GameServer extends WebSocketServer {
     }
 
     private void broadcastState() {
-        if (playerConnections.isEmpty()) return;
+        // FIX: Si el juego terminó, solo enviamos el estado una vez y luego el GameLoop
+        // ya no debería llamar esto.
+        // Pero si estamos en el lobby y hay jugadores, sí debemos enviar.
+        if (playerConnections.isEmpty())
+            return;
 
         Message message = new Message("UPDATE_STATE");
         message.setObjects(gameState.getGameObjects());
         message.setGameOver(gameState.isGameOver());
-
-        // --- NUEVO ---
         message.setGameInProgress(gameState.isGameInProgress());
         message.setPlayerScores(gameState.getPlayerScores());
         message.setPlayerNames(gameState.getPlayerNames());
-        // --- FIN NUEVO ---
 
         String jsonState = gson.toJson(message);
 
         for (WebSocket client : playerConnections.keySet()) {
-            client.send(jsonState);
+            // FIX de robustez: Envía solo si la conexión está abierta
+            if (client.isOpen()) {
+                client.send(jsonState);
+            }
         }
     }
 
@@ -204,36 +208,37 @@ public class GameServer extends WebSocketServer {
         }
     }
 
-
     // --- PUNTO DE ENTRADA (MAIN) ---
 
     public static void main(String[] args) {
         int wsPort = 12345;
-        int httpPort = 8080;
+        // int httpPort = 8080; // Eliminado
         try {
             GameServer server = new GameServer(wsPort);
 
             // 1. Inicia el servidor WebSocket (en un hilo separado)
             server.start();
-            // 'onStart()' será llamado cuando esté listo.
 
             // --- CORRECCIÓN: Iniciar el bucle del juego ---
-            // Esto faltaba en tu código. Lo iniciamos después del servidor.
             server.scheduleGameLoop();
 
-            // 2. Iniciar el servidor HTTP para los archivos web
-            HttpServer httpServer = HttpServer.create(new InetSocketAddress(httpPort), 0);
-
-            httpServer.createContext("/", exchange ->
-                    serveFile(exchange, "/public/index.html", "text/html")
-            );
-            httpServer.createContext("/game.js", exchange ->
-                    serveFile(exchange, "/public/game.js", "application/javascript")
-            );
-
-            httpServer.setExecutor(null);
-            httpServer.start();
-            System.out.println("Servidor HTTP iniciado en puerto " + httpPort + ". ¡Listo para escanear!");
+            // 🛑 2. ELIMINACIÓN DEL SERVIDOR HTTP DE ARCHIVOS ANTIGUOS
+            /*
+             * HttpServer httpServer = HttpServer.create(new InetSocketAddress(httpPort),
+             * 0);
+             * httpServer.createContext("/", exchange -> serveFile(exchange,
+             * "/public/index.html", "text/html"));
+             * httpServer.createContext("/game.js",
+             * exchange -> serveFile(exchange, "/public/game.js",
+             * "application/javascript"));
+             * 
+             * httpServer.setExecutor(null);
+             * httpServer.start();
+             * System.out.println("Servidor HTTP iniciado en puerto " + httpPort +
+             * ". ¡Listo para escanear!");
+             */
+            System.out
+                    .println("Servidor WebSocket iniciado en puerto " + wsPort + ". Conéctese desde el cliente React.");
 
             // 3. Hook de apagado (llama al método stop() corregido)
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -249,32 +254,4 @@ public class GameServer extends WebSocketServer {
 
     // --- SERVIDOR DE ARCHIVOS (Sin cambios) ---
 
-    private static void serveFile(HttpExchange exchange, String resourcePath, String contentType) throws IOException {
-        InputStream is = GameServer.class.getResourceAsStream(resourcePath);
-
-        if (is == null) {
-            String response = "404 (Not Found: " + resourcePath + ")";
-            exchange.sendResponseHeaders(404, response.length());
-            try (OutputStream os = exchange.getResponseBody()) {
-                os.write(response.getBytes());
-            }
-            return;
-        }
-
-        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-        int nRead;
-        byte[] data = new byte[1024];
-        while ((nRead = is.read(data, 0, data.length)) != -1) {
-            buffer.write(data, 0, nRead);
-        }
-        buffer.flush();
-        byte[] fileBytes = buffer.toByteArray();
-        is.close();
-
-        exchange.getResponseHeaders().set("Content-Type", contentType);
-        exchange.sendResponseHeaders(200, fileBytes.length);
-        try (OutputStream os = exchange.getResponseBody()) {
-            os.write(fileBytes);
-        }
-    }
 }

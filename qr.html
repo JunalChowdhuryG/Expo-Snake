@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de Código QR para URL</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        #qrcode {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+        }
+
+        input[type="text"] {
+            padding: 8px;
+            width: 300px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+        }
+
+        button {
+            padding: 10px 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Escanéame</h1>
+
+    <label for="ip_input">Ingresa la IP:</label>
+    <input type="text" id="ip_input" value="">
+
+    <button onclick="generarQR()">Generar Código QR</button>
+
+    <div id="qrcode"></div>
+
+    <script>
+        // La variable para almacenar la instancia de QRCode.
+        let qrcodeInstance = null;
+
+        // Define el puerto fijo que siempre se usará.
+        const PUERTO_FIJO = ':8080';
+
+        /**
+         * Función principal para generar el Código QR.
+         */
+        function generarQR() {
+            const ip = document.getElementById('ip_input').value.trim();
+
+            // Verifica que la IP no esté vacía.
+            if (!ip) {
+                alert("Por favor, ingresa una IP o dirección.");
+                return;
+            }
+
+            // Construye la URL completa. Asume 'http://' si no se especifica protocolo.
+            const urlCompleta = (ip.startsWith('http://') || ip.startsWith('https://'))
+                ? ip + PUERTO_FIJO
+                : 'http://' + ip + PUERTO_FIJO;
+
+            // Si ya existe una instancia de QR, primero la eliminamos (limpiamos el div).
+            if (qrcodeInstance) {
+                document.getElementById('qrcode').innerHTML = '';
+            }
+
+            // Crea una nueva instancia del Código QR.
+            // Se le pasa el elemento DIV con id 'qrcode' y las opciones.
+            qrcodeInstance = new QRCode(document.getElementById("qrcode"), {
+                text: urlCompleta, // El contenido del QR (la URL completa)
+                width: 200,        // Tamaño en píxeles
+                height: 200,       // Tamaño en píxeles
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H // Nivel de corrección de error (Alto)
+            });
+
+            console.log("QR generado para:", urlCompleta);
+        }
+
+        // Genera un QR inicial al cargar la página.
+        document.addEventListener('DOMContentLoaded', generarQR);
+    </script>
+
+</body>
+
+</html>

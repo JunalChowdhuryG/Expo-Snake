@@ -1,5 +1,3 @@
-"use client"
-
 import { useState, useEffect, useRef } from "react"
 import { useWebSocket } from "../hooks/useWebSocket"
 
@@ -16,6 +14,7 @@ interface GameObject {
 
 export default function SnakePeludo() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const [gameObjects, setGameObjects] = useState<GameObject[]>([])
   const [playerScores, setPlayerScores] = useState<Record<number, number>>({})
   const [playerNames, setPlayerNames] = useState<Record<number, string>>({})
@@ -25,6 +24,7 @@ export default function SnakePeludo() {
   const [connectionStatus, setConnectionStatus] = useState("Conectando...")
   const [myScore, setMyScore] = useState(0)
   const [myPlayerId, setMyPlayerId] = useState<number | null>(null)
+  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 })
 
   const hasSentJoin = useRef(false)
   const gameStartedTriggered = useRef(false)
@@ -47,6 +47,31 @@ export default function SnakePeludo() {
       }
     }
   })
+
+  // Calcular tamaño del canvas responsivo
+  useEffect(() => {
+    const updateCanvasSize = () => {
+      if (containerRef.current) {
+        const container = containerRef.current
+        const maxWidth = container.clientWidth - 32 // Restar padding
+        const maxHeight = window.innerHeight - 200
+
+        let width = maxWidth
+        let height = maxWidth * 0.75
+
+        if (height > maxHeight) {
+          height = maxHeight
+          width = height * 1.333
+        }
+
+        setCanvasSize({ width: Math.floor(width), height: Math.floor(height) })
+      }
+    }
+
+    updateCanvasSize()
+    window.addEventListener('resize', updateCanvasSize)
+    return () => window.removeEventListener('resize', updateCanvasSize)
+  }, [])
 
   // --- UNIÓN AL JUEGO ---
   useEffect(() => {
@@ -120,6 +145,11 @@ export default function SnakePeludo() {
 
     const ctx = canvas.getContext("2d")
     if (!ctx) return
+
+    // Escalar el contexto
+    const scaleX = canvasSize.width / 800
+    const scaleY = canvasSize.height / 600
+    ctx.setTransform(scaleX, 0, 0, scaleY, 0, 0)
 
     // Fondo
     const gradient = ctx.createLinearGradient(0, 0, 800, 600)
@@ -242,7 +272,8 @@ export default function SnakePeludo() {
     })
 
     ctx.shadowBlur = 0
-  }, [gameObjects, myPlayerId])
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+  }, [gameObjects, myPlayerId, canvasSize])
 
   const parseColor = (colorName: string) => {
     const colors: Record<string, string> = {
@@ -274,7 +305,7 @@ export default function SnakePeludo() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-green-900 to-teal-950 flex items-center justify-center p-4">
-      <div className="max-w-4xl w-full space-y-4">
+      <div ref={containerRef} className="max-w-4xl w-full space-y-4">
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
@@ -296,8 +327,8 @@ export default function SnakePeludo() {
         <div className="relative bg-gradient-to-br from-green-950/60 to-emerald-950/60 backdrop-blur-xl border-2 border-green-500/30 rounded-2xl p-4 shadow-2xl">
           <canvas
             ref={canvasRef}
-            width={800}
-            height={600}
+            width={canvasSize.width}
+            height={canvasSize.height}
             className="w-full rounded-lg shadow-inner"
             style={{ imageRendering: 'crisp-edges' }}
           />
