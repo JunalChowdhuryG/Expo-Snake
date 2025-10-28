@@ -25,11 +25,13 @@ export default function SnakePeludo() {
   const [myScore, setMyScore] = useState(0)
   const [myPlayerId, setMyPlayerId] = useState<number | null>(null)
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 })
+  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null)
+  const [isMobile, setIsMobile] = useState(false)
 
   const hasSentJoin = useRef(false)
   const gameStartedTriggered = useRef(false)
 
-  const { sendMessage, isConnected } = useWebSocket("ws://localhost:12345", (message) => {
+  const { sendMessage, isConnected } = useWebSocket("ws://10.1.18.112:12345", (message) => {
     if (message.action === "PLAYER_ID") {
       setMyPlayerId(message.playerId)
       if (!gameStartedTriggered.current) {
@@ -53,27 +55,33 @@ export default function SnakePeludo() {
     const updateCanvasSize = () => {
       if (containerRef.current) {
         const container = containerRef.current
-        const maxWidth = container.clientWidth - 32 // Restar padding
+        const maxWidth = container.clientWidth - 32
         const maxHeight = window.innerHeight - 200
 
         let width = maxWidth
-        let height = maxWidth * 0.75
+        let height = maxWidth
 
         if (height > maxHeight) {
           height = maxHeight
-          width = height * 1.333
+          width = height
         }
 
         setCanvasSize({ width: Math.floor(width), height: Math.floor(height) })
       }
     }
 
+    // Detectar si es móvil
+    const checkMobile = () => {
+      setIsMobile('ontouchstart' in window || navigator.maxTouchPoints > 0)
+    }
+
     updateCanvasSize()
+    checkMobile()
     window.addEventListener('resize', updateCanvasSize)
     return () => window.removeEventListener('resize', updateCanvasSize)
   }, [])
 
-  // --- UNIÓN AL JUEGO ---
+  // UNIÓN AL JUEGO
   useEffect(() => {
     if (isConnected && !hasSentJoin.current) {
       setConnectionStatus("Conectado")
@@ -89,7 +97,7 @@ export default function SnakePeludo() {
     }
   }, [isConnected, sendMessage])
 
-  // --- CONTROLES ---
+  // CONTROLES DE TECLADO
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === " ") {
@@ -138,7 +146,53 @@ export default function SnakePeludo() {
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [gameInProgress, gameOver, isPaused, sendMessage])
 
-  // --- RENDERIZADO (TU ESTILO ORIGINAL) ---
+  // CONTROLES TÁCTILES
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (!gameInProgress || gameOver || isPaused) return
+    const touch = e.touches[0]
+    setTouchStart({ x: touch.clientX, y: touch.clientY })
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    e.preventDefault()
+  }
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!touchStart || !gameInProgress || gameOver || isPaused) return
+
+    const touch = e.changedTouches[0]
+    const deltaX = touch.clientX - touchStart.x
+    const deltaY = touch.clientY - touchStart.y
+    const minSwipe = 30
+
+    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+      if (Math.abs(deltaX) > minSwipe) {
+        sendMessage({
+          action: "PLAYER_INPUT",
+          input: deltaX > 0 ? "RIGHT" : "LEFT"
+        })
+      }
+    } else {
+      if (Math.abs(deltaY) > minSwipe) {
+        sendMessage({
+          action: "PLAYER_INPUT",
+          input: deltaY > 0 ? "DOWN" : "UP"
+        })
+      }
+    }
+
+    setTouchStart(null)
+  }
+
+  const handleDirectionButton = (direction: string) => {
+    if (!gameInProgress || gameOver || isPaused) return
+    sendMessage({
+      action: "PLAYER_INPUT",
+      input: direction
+    })
+  }
+
+  // RENDERIZADO
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -146,7 +200,6 @@ export default function SnakePeludo() {
     const ctx = canvas.getContext("2d")
     if (!ctx) return
 
-    // Escalar el contexto
     const scaleX = canvasSize.width / 800
     const scaleY = canvasSize.height / 600
     ctx.setTransform(scaleX, 0, 0, scaleY, 0, 0)
@@ -158,7 +211,7 @@ export default function SnakePeludo() {
     ctx.fillStyle = gradient
     ctx.fillRect(0, 0, 800, 600)
 
-    // Grid sutil
+    // Grid
     ctx.strokeStyle = "rgba(0, 100, 0, 0.2)"
     ctx.lineWidth = 1
     for (let i = 0; i < 800; i += 50) {
@@ -174,7 +227,7 @@ export default function SnakePeludo() {
       ctx.stroke()
     }
 
-    // Dibujar objetos del backend
+    // Dibujar objetos
     gameObjects.forEach(obj => {
       if (obj.type === "SNAKE_HEAD" || obj.type === "SNAKE_BODY") {
         const isMySnake = obj.playerId === myPlayerId
@@ -182,14 +235,12 @@ export default function SnakePeludo() {
         const bright = adjustBrightness(baseColor, 30)
         const dark = adjustBrightness(baseColor, -30)
 
-        // Cuerpo peludo
         const grad = ctx.createLinearGradient(obj.x, obj.y, obj.x + 16, obj.y + 16)
         grad.addColorStop(0, bright)
         grad.addColorStop(1, dark)
         ctx.fillStyle = grad
         ctx.fillRect(obj.x, obj.y, 16, 16)
 
-        // Pelitos
         ctx.strokeStyle = dark
         ctx.lineWidth = 1
         for (let i = 0; i < 15; i++) {
@@ -203,7 +254,6 @@ export default function SnakePeludo() {
         }
 
         if (obj.type === "SNAKE_HEAD") {
-          // Ojos
           ctx.fillStyle = "#ffffff"
           ctx.beginPath()
           ctx.arc(obj.x + 4, obj.y + 4, 3, 0, Math.PI * 2)
@@ -220,7 +270,6 @@ export default function SnakePeludo() {
           ctx.arc(obj.x + 12, obj.y + 4, 1.5, 0, Math.PI * 2)
           ctx.fill()
 
-          // Boca
           ctx.strokeStyle = "#ef4444"
           ctx.lineWidth = 2
           ctx.beginPath()
@@ -228,7 +277,6 @@ export default function SnakePeludo() {
           ctx.quadraticCurveTo(obj.x + 8, obj.y + 14, obj.x + 13, obj.y + 12)
           ctx.stroke()
 
-          // Brillo si es mi serpiente
           if (isMySnake) {
             ctx.shadowBlur = 15
             ctx.shadowColor = "#22c55e"
@@ -253,11 +301,9 @@ export default function SnakePeludo() {
         ctx.arc(obj.x + 8, obj.y + 8, 10, 0, Math.PI * 2)
         ctx.fill()
 
-        // Tallo
         ctx.fillStyle = '#84cc16'
         ctx.fillRect(obj.x + 6, obj.y - 4, 4, 8)
 
-        // Valor
         ctx.fillStyle = '#ffffff'
         ctx.font = 'bold 12px Arial'
         const value = obj.health?.toString() || '1'
@@ -312,7 +358,9 @@ export default function SnakePeludo() {
             <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-300 to-emerald-400">
               Snacke Game
             </h1>
-            <p className="text-green-400/70 text-sm mt-1">Usa ← → / A D para girar. ↑ ↓ / W S para subir/bajar.</p>
+            <p className="text-green-400/70 text-sm mt-1">
+              {isMobile ? "Desliza o usa los botones para moverte" : "Usa ← → / A D para girar. ↑ ↓ / W S para subir/bajar."}
+            </p>
             <p className="text-xs text-gray-400 mt-1">
               Estado: <span className={isConnected ? "text-green-500" : "text-red-500"}>{connectionStatus}</span>
             </p>
@@ -331,6 +379,9 @@ export default function SnakePeludo() {
             height={canvasSize.height}
             className="w-full rounded-lg shadow-inner"
             style={{ imageRendering: 'crisp-edges' }}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
           />
 
           {/* Overlays */}
@@ -355,6 +406,50 @@ export default function SnakePeludo() {
             </div>
           )}
         </div>
+
+        {/* Controles táctiles para móvil */}
+        {isMobile && !gameOver && (
+          <div className="flex justify-center items-center gap-4">
+            <div className="grid grid-cols-3 gap-2">
+              <div></div>
+              <button
+                onTouchStart={(e) => { e.preventDefault(); handleDirectionButton("UP") }}
+                className="w-16 h-16 bg-green-500/20 hover:bg-green-500/40 border-2 border-green-400/50 rounded-lg flex items-center justify-center text-3xl active:scale-95 transition-transform"
+              >
+                ↑
+              </button>
+              <div></div>
+
+              <button
+                onTouchStart={(e) => { e.preventDefault(); handleDirectionButton("LEFT") }}
+                className="w-16 h-16 bg-green-500/20 hover:bg-green-500/40 border-2 border-green-400/50 rounded-lg flex items-center justify-center text-3xl active:scale-95 transition-transform"
+              >
+                ←
+              </button>
+              <button
+                onTouchStart={(e) => { e.preventDefault(); setIsPaused(p => !p) }}
+                className="w-16 h-16 bg-yellow-500/20 hover:bg-yellow-500/40 border-2 border-yellow-400/50 rounded-lg flex items-center justify-center text-2xl active:scale-95 transition-transform"
+              >
+                {isPaused ? "▶" : "⏸"}
+              </button>
+              <button
+                onTouchStart={(e) => { e.preventDefault(); handleDirectionButton("RIGHT") }}
+                className="w-16 h-16 bg-green-500/20 hover:bg-green-500/40 border-2 border-green-400/50 rounded-lg flex items-center justify-center text-3xl active:scale-95 transition-transform"
+              >
+                →
+              </button>
+
+              <div></div>
+              <button
+                onTouchStart={(e) => { e.preventDefault(); handleDirectionButton("DOWN") }}
+                className="w-16 h-16 bg-green-500/20 hover:bg-green-500/40 border-2 border-green-400/50 rounded-lg flex items-center justify-center text-3xl active:scale-95 transition-transform"
+              >
+                ↓
+              </button>
+              <div></div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
