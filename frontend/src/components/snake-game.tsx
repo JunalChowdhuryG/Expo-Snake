@@ -1,113 +1,180 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
-import { useWebSocket } from "../hooks/useWebSocket"
+import { useState, useEffect, useRef, useCallback } from "react"
+import { Button } from "@/components/ui/button"
 
 interface SnakeGameProps {
   player: { id: string; name: string }
   onBack: () => void
 }
 
-interface GameObject {
+const GRID_SIZE = 20
+const CELL_SIZE = 20
+
+interface Position {
   x: number
   y: number
-  width: number
-  height: number
-  type: string
-  playerId: number
-  color?: string
-  health?: number
 }
 
-const TILE_SIZE = 16
-const ROWS = 40
-const COLUMNS = 40
-const BOARD_WIDTH = TILE_SIZE * COLUMNS
-const BOARD_HEIGHT = TILE_SIZE * ROWS
+type Direction = "UP" | "DOWN" | "LEFT" | "RIGHT"
 
 export default function SnakeGame({ player, onBack }: SnakeGameProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [gameObjects, setGameObjects] = useState<GameObject[]>([])
-  const [playerScores, setPlayerScores] = useState<Record<number, number>>({})
+  const [snake, setSnake] = useState<Position[]>([{ x: 10, y: 10 }])
+  const [food, setFood] = useState<Position>({ x: 15, y: 15 })
+  const [direction, setDirection] = useState<Direction>("RIGHT")
+  const [nextDirection, setNextDirection] = useState<Direction>("RIGHT")
+  const [score, setScore] = useState(0)
   const [gameOver, setGameOver] = useState(false)
-  const [gameInProgress, setGameInProgress] = useState(false)
-  const [connectionStatus, setConnectionStatus] = useState("Conectando...")
-  const [myScore, setMyScore] = useState(0)
+  const [isPaused, setIsPaused] = useState(false)
+  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null)
+  const gameLoopRef = useRef<NodeJS.Timeout | null>(null)
 
-  const { sendMessage, isConnected } = useWebSocket("ws://localhost:12345", (message) => {
-    if (message.action === "PLAYER_ID") {
-      console.log("[v0] Recibido ID del jugador:", message.playerId)
-    } else if (message.action === "UPDATE_STATE") {
-      setGameObjects(message.objects || [])
-      setGameOver(message.gameOver || false)
-      setGameInProgress(message.gameInProgress || false)
-      setPlayerScores(message.playerScores || {})
+  // Generate random food position
+  const generateFood = useCallback(() => {
+    let newFood: Position
+    do {
+      newFood = {
+        x: Math.floor(Math.random() * GRID_SIZE),
+        y: Math.floor(Math.random() * GRID_SIZE),
+      }
+    } while (snake.some((segment) => segment.x === newFood.x && segment.y === newFood.y))
+    return newFood
+  }, [snake])
 
-      // Actualizar mi puntuación
-      const myPlayerId = Number.parseInt(player.id.split("-")[1] || "0")
-      setMyScore(message.playerScores?.[myPlayerId] || 0)
-    }
-  })
-
-  // Unirse al juego cuando se conecte
+  // Lógica para guardar estadísticas al terminar (necesaria para el Lobby)
   useEffect(() => {
-    if (isConnected) {
-      setConnectionStatus("Conectado")
-      sendMessage({
-        action: "JOIN_GAME",
-        playerName: player.name,
-      })
-    } else {
-      setConnectionStatus("Desconectado")
-    }
-  }, [isConnected, player.name, sendMessage])
+    if (gameOver && score > 0) {
+      const statsKey = `player-stats-${player.id}`
+      const savedStats = localStorage.getItem(statsKey)
+      const currentStats = savedStats
+        ? JSON.parse(savedStats)
+        : { gamesPlayed: 0, highScore: 0, totalScore: 0 }
 
-  // Iniciar el juego
-  const handleStartGame = () => {
-    sendMessage({
-      action: "START_GAME",
-    })
-  }
-
-  // Reiniciar el juego
-  const handleRestart = () => {
-    sendMessage({
-      action: "RESTART_GAME",
-    })
-  }
-
-  // Manejar entrada del teclado
-  useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      if (!gameInProgress || gameOver) return
-
-      const key = e.key.toUpperCase()
-      let direction: string | null = null
-
-      if (key === "ARROWUP" || key === "W") {
-        direction = "UP"
-      } else if (key === "ARROWDOWN" || key === "S") {
-        direction = "DOWN"
-      } else if (key === "ARROWLEFT" || key === "A") {
-        direction = "LEFT"
-      } else if (key === "ARROWRIGHT" || key === "D") {
-        direction = "RIGHT"
+      const newStats = {
+        gamesPlayed: currentStats.gamesPlayed + 1,
+        highScore: Math.max(currentStats.highScore, score),
+        totalScore: currentStats.totalScore + score,
       }
 
-      if (direction) {
+      localStorage.setItem(statsKey, JSON.stringify(newStats))
+    }
+  }, [gameOver, score, player.id])
+
+  // Handle keyboard input (sin cambios)
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      const key = e.key.toUpperCase()
+      if (key === "ARROWUP" || key === "W") {
+        setNextDirection("UP")
         e.preventDefault()
-        sendMessage({
-          action: "PLAYER_INPUT",
-          input: direction,
-        })
+      } else if (key === "ARROWDOWN" || key === "S") {
+        setNextDirection("DOWN")
+        e.preventDefault()
+      } else if (key === "ARROWLEFT" || key === "A") {
+        setNextDirection("LEFT")
+        e.preventDefault()
+      } else if (key === "ARROWRIGHT" || key === "D") {
+        setNextDirection("RIGHT")
+        e.preventDefault()
+      } else if (key === " ") {
+        setIsPaused((prev) => !prev)
+        e.preventDefault()
       }
     }
 
     window.addEventListener("keydown", handleKeyPress)
     return () => window.removeEventListener("keydown", handleKeyPress)
-  }, [gameInProgress, gameOver, sendMessage])
+  }, [])
 
-  // Dibujar el juego en canvas
+  // Handle touch controls for mobile (sin cambios)
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0]
+    setTouchStart({ x: touch.clientX, y: touch.clientY })
+  }
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!touchStart) return
+
+    const touch = e.changedTouches[0]
+    const deltaX = touch.clientX - touchStart.x
+    const deltaY = touch.clientY - touchStart.y
+    const minSwipeDistance = 30
+
+    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+      if (Math.abs(deltaX) > minSwipeDistance) {
+        setNextDirection(deltaX > 0 ? "RIGHT" : "LEFT")
+      }
+    } else {
+      if (Math.abs(deltaY) > minSwipeDistance) {
+        setNextDirection(deltaY > 0 ? "DOWN" : "UP")
+      }
+    }
+
+    setTouchStart(null)
+  }
+
+  // Game loop (sin cambios)
+  useEffect(() => {
+    if (gameOver || isPaused) return
+
+    gameLoopRef.current = setInterval(() => {
+      setSnake((prevSnake) => {
+        let newDirection = nextDirection
+
+        if (
+          (newDirection === "UP" && direction === "DOWN") ||
+          (newDirection === "DOWN" && direction === "UP") ||
+          (newDirection === "LEFT" && direction === "RIGHT") ||
+          (newDirection === "RIGHT" && direction === "LEFT")
+        ) {
+          newDirection = direction
+        }
+
+        setDirection(newDirection)
+
+        const head = prevSnake[0]
+        const newHead: Position = { ...head }
+
+        switch (newDirection) {
+          case "UP":
+            newHead.y = (head.y - 1 + GRID_SIZE) % GRID_SIZE
+            break
+          case "DOWN":
+            newHead.y = (head.y + 1) % GRID_SIZE
+            break
+          case "LEFT":
+            newHead.x = (head.x - 1 + GRID_SIZE) % GRID_SIZE
+            break
+          case "RIGHT":
+            newHead.x = (head.x + 1) % GRID_SIZE
+            break
+        }
+
+        if (prevSnake.some((segment) => segment.x === newHead.x && segment.y === newHead.y)) {
+          setGameOver(true)
+          return prevSnake
+        }
+
+        const newSnake = [newHead, ...prevSnake]
+
+        if (newHead.x === food.x && newHead.y === food.y) {
+          setScore((prev) => prev + 10)
+          setFood(generateFood())
+        } else {
+          newSnake.pop()
+        }
+
+        return newSnake
+      })
+    }, 100)
+
+    return () => {
+      if (gameLoopRef.current) clearInterval(gameLoopRef.current)
+    }
+  }, [direction, nextDirection, food, gameOver, isPaused, generateFood])
+
+  // Draw game (Lógica de dibujo actualizada)
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -115,181 +182,158 @@ export default function SnakeGame({ player, onBack }: SnakeGameProps) {
     const ctx = canvas.getContext("2d")
     if (!ctx) return
 
-    // Limpiar canvas
-    ctx.fillStyle = "#0a0a0a"
+    // 1. Fondo Verde Oscuro (Requisito: Fondo Verde)
+    ctx.fillStyle = "#0d3b1a" // Verde Oscuro
     ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-    // Dibujar grid
-    ctx.strokeStyle = "#1a1a1a"
+    // 2. Dibujar cuadrícula sutil
+    ctx.strokeStyle = "#1a5c2e"
     ctx.lineWidth = 0.5
-    for (let i = 0; i <= COLUMNS; i++) {
+    for (let i = 0; i <= GRID_SIZE; i++) {
       ctx.beginPath()
-      ctx.moveTo(i * TILE_SIZE, 0)
-      ctx.lineTo(i * TILE_SIZE, canvas.height)
+      ctx.moveTo(i * CELL_SIZE, 0)
+      ctx.lineTo(i * CELL_SIZE, canvas.height)
       ctx.stroke()
 
       ctx.beginPath()
-      ctx.moveTo(0, i * TILE_SIZE)
-      ctx.lineTo(canvas.width, i * TILE_SIZE)
+      ctx.moveTo(0, i * CELL_SIZE)
+      ctx.lineTo(canvas.width, i * CELL_SIZE)
       ctx.stroke()
     }
 
-    // Dibujar objetos del juego
-    gameObjects.forEach((obj) => {
-      switch (obj.type) {
-        case "SNAKE_HEAD":
-          ctx.fillStyle = obj.color || "#22c55e"
-          ctx.shadowColor = obj.color || "#22c55e"
-          ctx.shadowBlur = 10
-          ctx.fillRect(obj.x + 1, obj.y + 1, obj.width - 2, obj.height - 2)
-          break
-
-        case "SNAKE_BODY":
-          ctx.fillStyle = obj.color ? adjustBrightness(obj.color, -30) : "#16a34a"
-          ctx.shadowColor = "transparent"
-          ctx.fillRect(obj.x + 1, obj.y + 1, obj.width - 2, obj.height - 2)
-          break
-
-        case "FRUIT":
-          ctx.fillStyle = "#f97316"
-          ctx.shadowColor = "#f97316"
-          ctx.shadowBlur = 8
-          ctx.beginPath()
-          ctx.arc(obj.x + obj.width / 2, obj.y + obj.height / 2, obj.width / 2 - 2, 0, Math.PI * 2)
-          ctx.fill()
-
-          // Dibujar valor de la fruta
-          ctx.fillStyle = "#ffffff"
-          ctx.font = "bold 10px Arial"
-          ctx.textAlign = "center"
-          ctx.textBaseline = "middle"
-          ctx.fillText(String(obj.health || 1), obj.x + obj.width / 2, obj.y + obj.height / 2)
-          break
-
-        case "WALL":
-          ctx.fillStyle = "#666666"
-          ctx.fillRect(obj.x, obj.y, obj.width, obj.height)
-          break
+    // 3. Dibujar Serpiente
+    snake.forEach((segment, index) => {
+      if (index === 0) {
+        // Cabeza - Verde brillante con sombra
+        ctx.fillStyle = "#10b981"
+        ctx.shadowColor = "#10b981"
+        ctx.shadowBlur = 15
+      } else {
+        // Cuerpo - Verde medio
+        ctx.fillStyle = "#059669"
+        ctx.shadowColor = "transparent"
       }
+      ctx.fillRect(segment.x * CELL_SIZE + 1, segment.y * CELL_SIZE + 1, CELL_SIZE - 2, CELL_SIZE - 2)
     })
 
-    ctx.shadowColor = "transparent"
-  }, [gameObjects])
+    // 4. Dibujar Fruta (Requisito: Agregar frutas - estilizado como fruta)
+    ctx.fillStyle = "#fbbf24" // Amarillo Dorado (Color de fruta/manzana)
+    ctx.shadowColor = "#fbbf24"
+    ctx.shadowBlur = 12
+    ctx.beginPath()
+    ctx.arc(food.x * CELL_SIZE + CELL_SIZE / 2, food.y * CELL_SIZE + CELL_SIZE / 2, CELL_SIZE / 2 - 3, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.shadowBlur = 0
+
+    // Simular un pequeño tallo verde
+    ctx.fillStyle = "#a3e635"
+    ctx.fillRect(food.x * CELL_SIZE + CELL_SIZE / 2 - 1, food.y * CELL_SIZE + 2, 2, 4);
+
+  }, [snake, food])
+
+  const handleRestart = () => {
+    setSnake([{ x: 10, y: 10 }])
+    setFood(generateFood())
+    setDirection("RIGHT")
+    setNextDirection("RIGHT")
+    setScore(0)
+    setGameOver(false)
+    setIsPaused(false)
+  }
 
   return (
-    <div className="min-h-screen p-4 flex items-center justify-center">
-      <div className="w-full max-w-4xl">
+    <div className="min-h-screen bg-gradient-to-br from-green-900 via-green-800 to-emerald-900 p-3 sm:p-4 md:p-6 flex items-center justify-center">
+      <div className="w-full max-w-4xl mx-auto">
         {/* Header */}
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-3 sm:mb-4 md:mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-green-500">🐍 SNAKE GAME</h1>
-            <p className="text-sm text-gray-400">{player.name}</p>
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 to-green-200">
+              🐍 SNAKE GAME
+            </h1>
+            <p className="text-xs sm:text-sm text-emerald-300/70">{player.name}</p>
           </div>
-          <div className="text-right">
-            <p className="text-sm text-gray-400">
-              Estado: <span className={isConnected ? "text-green-500" : "text-red-500"}>{connectionStatus}</span>
-            </p>
-            <button
-              onClick={onBack}
-              className="mt-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg border border-gray-600 transition-colors"
-            >
-              Volver
-            </button>
-          </div>
+          <Button
+            onClick={onBack}
+            variant="outline"
+            className="border-emerald-400/40 text-emerald-300 hover:bg-emerald-500/20 bg-green-950/60 backdrop-blur-sm text-xs sm:text-sm px-3 sm:px-4"
+          >
+            Volver
+          </Button>
         </div>
 
-        {/* Game Container */}
-        <div className="bg-slate-800 border-2 border-green-500/30 rounded-xl p-6 mb-6 shadow-xl">
-          <div className="flex gap-6">
+        {/* Game Container (Aplica el estilo verde al borde del contenedor) */}
+        <div className="bg-green-950/60 backdrop-blur-md border border-emerald-400/30 rounded-xl p-3 sm:p-4 md:p-6 mb-3 sm:mb-4 md:mb-6 shadow-2xl">
+          <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 md:gap-6">
             {/* Canvas */}
             <div className="flex-1">
               <canvas
                 ref={canvasRef}
-                width={BOARD_WIDTH}
-                height={BOARD_HEIGHT}
-                className="w-full border-2 border-green-500/50 rounded-lg bg-black"
+                width={GRID_SIZE * CELL_SIZE}
+                height={GRID_SIZE * CELL_SIZE}
+                // El fondo interior es verde oscuro a través de Canvas
+                className="w-full max-w-full aspect-square border-2 border-emerald-500/30 rounded-lg shadow-lg"
+                onTouchStart={handleTouchStart}
+                onTouchEnd={handleTouchEnd}
               />
             </div>
 
-            {/* Stats Sidebar */}
-            <div className="w-40 space-y-4">
-              <div className="bg-slate-700 rounded-lg p-4 text-center border border-green-500/20">
-                <p className="text-xs text-gray-400 mb-1">Mi Puntuación</p>
-                <p className="text-3xl font-bold text-green-500">{myScore}</p>
+            {/* Stats Sidebar (Con el fondo verde oscuro solicitado) */}
+            <div className="flex lg:flex-col gap-3 sm:gap-4 lg:w-32">
+              <div className="flex-1 lg:flex-none bg-green-900/50 backdrop-blur-sm rounded-lg p-3 sm:p-4 text-center border border-emerald-400/20">
+                <p className="text-xs text-green-200/70 mb-1">Puntuación</p>
+                <p className="text-2xl sm:text-3xl font-black text-emerald-300">{score}</p>
               </div>
 
-              <div className="bg-slate-700 rounded-lg p-4 text-center border border-blue-500/20">
-                <p className="text-xs text-gray-400 mb-1">Estado</p>
-                <p className="text-sm font-bold text-blue-500">
-                  {gameOver ? "GAME OVER" : gameInProgress ? "JUGANDO" : "LOBBY"}
+              <div className="flex-1 lg:flex-none bg-green-900/50 backdrop-blur-sm rounded-lg p-3 sm:p-4 text-center border border-cyan-400/20">
+                <p className="text-xs text-green-200/70 mb-1">Longitud</p>
+                <p className="text-xl sm:text-2xl font-black text-cyan-300">{snake.length}</p>
+              </div>
+
+              <div className="flex-1 lg:flex-none bg-green-900/50 backdrop-blur-sm rounded-lg p-3 sm:p-4 text-center border border-yellow-400/20">
+                <p className="text-xs text-green-200/70 mb-1">Estado</p>
+                <p className="text-xs sm:text-sm font-bold text-yellow-300">
+                  {gameOver ? "GAME OVER" : isPaused ? "PAUSADO" : "JUGANDO"}
                 </p>
-              </div>
-
-              {/* Scoreboard */}
-              <div className="bg-slate-700 rounded-lg p-3 border border-orange-500/20">
-                <p className="text-xs text-gray-400 mb-2 font-bold">Puntuaciones</p>
-                <div className="space-y-1 text-xs">
-                  {Object.entries(playerScores).map(([id, score]) => (
-                    <div key={id} className="flex justify-between text-gray-300">
-                      <span>P{id}:</span>
-                      <span className="text-orange-500 font-bold">{score}</span>
-                    </div>
-                  ))}
-                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Controls */}
+        {/* Controles de Juego */}
         <div className="space-y-3">
-          {!gameInProgress && !gameOver && (
-            <button
-              onClick={handleStartGame}
-              className="w-full py-4 text-lg font-bold bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
-            >
-              Iniciar Juego
-            </button>
-          )}
-
           {gameOver && (
-            <div className="bg-red-900/30 border-2 border-red-500 rounded-lg p-4 text-center">
-              <p className="text-red-500 font-bold text-lg">¡GAME OVER!</p>
-              <p className="text-sm text-gray-300 mt-1">Puntuación final: {myScore}</p>
+            <div className="bg-red-500/20 backdrop-blur-sm border border-red-400/40 rounded-lg p-3 sm:p-4 text-center">
+              <p className="text-red-300 font-bold text-lg sm:text-xl">¡GAME OVER!</p>
+              <p className="text-sm text-red-200/70 mt-1">Puntuación final: {score}</p>
             </div>
           )}
 
-          {gameOver && (
-            <button
+          <div className="flex gap-2 sm:gap-3">
+            <Button
               onClick={handleRestart}
-              className="w-full py-3 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-lg transition-colors"
+              className="flex-1 py-5 sm:py-6 text-sm sm:text-base font-bold bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white rounded-lg shadow-lg"
             >
-              Reiniciar Juego
-            </button>
-          )}
+              {gameOver ? "🔄 Reiniciar" : "🎮 Nuevo Juego"}
+            </Button>
+            <Button
+              onClick={() => setIsPaused(!isPaused)}
+              disabled={gameOver}
+              variant="outline"
+              className="flex-1 py-5 sm:py-6 text-sm sm:text-base font-bold border-emerald-400/40 text-emerald-300 hover:bg-emerald-500/20 bg-green-950/60 backdrop-blur-sm disabled:opacity-50 rounded-lg"
+            >
+              {isPaused ? "▶️ Reanudar" : "⏸️ Pausar"}
+            </Button>
+          </div>
 
-          <div className="text-xs text-gray-500 text-center space-y-1">
-            <p>Controles: Flechas o WASD para mover</p>
-            <p>Come la comida naranja para crecer y ganar puntos</p>
+          <div className="bg-green-950/40 backdrop-blur-sm border border-emerald-400/20 rounded-lg p-3 sm:p-4">
+            <div className="text-xs sm:text-sm text-green-100 text-center space-y-2">
+              <p className="font-semibold text-emerald-300">📱 Móvil: Desliza en el canvas</p>
+              <p className="font-semibold text-cyan-300">⌨️ PC: Flechas o WASD</p>
+              <p className="text-green-200/70">Come la comida dorada 🟡 para crecer y ganar puntos</p>
+            </div>
           </div>
         </div>
       </div>
     </div>
   )
-}
-
-// Función auxiliar para ajustar brillo de color
-function adjustBrightness(color: string, percent: number): string {
-  const colorMap: Record<string, string> = {
-    CYAN: "#06b6d4",
-    MAGENTA: "#d946ef",
-    YELLOW: "#eab308",
-    ORANGE: "#ea580c",
-    PINK: "#ec4899",
-    GREEN: "#22c55e",
-    BLUE: "#3b82f6",
-    RED: "#ef4444",
-    WHITE: "#ffffff",
-  }
-  return colorMap[color] || "#ffffff"
 }
