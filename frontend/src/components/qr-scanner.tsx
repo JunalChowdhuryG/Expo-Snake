@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef } from "react"
+// Importar Button si es necesario, pero lo manejamos con etiqueta <button> simple aquí.
 
 interface QRScannerProps {
   onScanned: (data: { id: string; name: string }) => void
@@ -47,73 +48,51 @@ export default function QRScanner({ onScanned }: QRScannerProps) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-5xl font-bold text-green-500 mb-2 drop-shadow-lg">🐍 SNAKE GAME</h1>
-          <p className="text-gray-300 text-lg">Escanea el QR para comenzar</p>
+    // Contenedor principal: Centrado y responsive
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 sm:p-6">
+      {/* Contenedor central con separación aumentada (space-y-10) */}
+      <div className="w-full max-w-sm mx-auto space-y-10">
+
+        {/* Header (Separado del contenido inferior por space-y-10) */}
+        <div className="text-center space-y-2">
+          <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 to-green-400 drop-shadow-lg">
+            🐍 SNAKE GAME
+          </h1>
+          <p className="text-gray-400 text-sm sm:text-base">Inicia tu sesión de juego.</p>
         </div>
 
-        {/* QR Scanner Card */}
-        <div className="bg-slate-800 border-2 border-green-500/30 rounded-xl p-6 mb-6 shadow-xl">
-          {!isScanning ? (
-            <div className="space-y-4">
-              <div className="aspect-square bg-slate-700 rounded-lg flex items-center justify-center border-2 border-dashed border-green-500/20">
-                <div className="text-center">
-                  <div className="text-6xl mb-2">📱</div>
-                  <p className="text-sm text-gray-400">Cámara desactivada</p>
-                </div>
-              </div>
-              <button
-                onClick={startCamera}
-                className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition-colors"
-              >
-                Activar Cámara
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                className="w-full aspect-square rounded-lg bg-black border-2 border-green-500/50"
-              />
-              <button
-                onClick={stopCamera}
-                className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-lg border border-gray-600 transition-colors"
-              >
-                Detener Cámara
-              </button>
-            </div>
-          )}
-        </div>
+        {/* CARD DE ENTRADA MANUAL (Con Padding Interno) */}
+        <div className="bg-slate-800/80 backdrop-blur-sm border border-green-500/30 rounded-xl p-6 space-y-6 shadow-2xl">
 
-        {/* Manual Input */}
-        <div className="space-y-3">
-          <div className="relative">
+          <div className="text-center">
+            <p className="text-sm font-medium text-white mb-2">Ingresa tu Nombre para Jugar:</p>
+          </div>
+
+          {/* Manual Input (Separado) */}
+          <div className="space-y-4"> {/* Separación entre input y botón */}
             <input
               type="text"
-              placeholder="O ingresa tu nombre manualmente"
+              placeholder="Máximo 6 letras"
+              maxLength={6}
               value={manualInput}
               onChange={(e) => setManualInput(e.target.value)}
               onKeyPress={(e) => e.key === "Enter" && handleManualSubmit()}
-              className="w-full px-4 py-3 bg-slate-700 border-2 border-green-500/30 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20 transition-colors"
+              className="w-full px-4 py-3 bg-slate-700 border border-green-500/30 rounded-lg text-white placeholder-slate-400 text-center text-lg focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20 transition-colors"
             />
+            <button
+              onClick={handleManualSubmit}
+              disabled={!manualInput.trim()}
+              className="w-full py-3 text-base font-bold rounded-lg transition-all 
+              bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white shadow-lg shadow-orange-600/30"
+            >
+              🚀 Ingresar al Juego
+            </button>
           </div>
-          <button
-            onClick={handleManualSubmit}
-            disabled={!manualInput.trim()}
-            className="w-full py-3 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-colors"
-          >
-            Ingresar
-          </button>
         </div>
 
-        {/* Footer */}
-        <div className="mt-8 text-center text-xs text-gray-500">
-          <p>Conectando a servidor WebSocket en localhost:12345</p>
+        {/* Footer (Separado por space-y-10 del contenido superior) */}
+        <div className="text-center text-xs text-gray-500">
+          <p>Asegúrate de que el servidor WebSocket esté activo en localhost:12345.</p>
         </div>
       </div>
     </div>

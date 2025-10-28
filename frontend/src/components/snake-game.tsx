@@ -1,316 +1,275 @@
-import { useState, useEffect, useRef } from 'react'
-import { Button } from '@/components/ui/button'
+"use client"
+
+import { useState, useEffect, useRef } from "react"
+import { useWebSocket } from "../hooks/useWebSocket"
+
+interface GameObject {
+  x: number
+  y: number
+  width: number
+  height: number
+  type: string
+  playerId: number
+  color?: string
+  health?: number
+}
 
 export default function SnakePeludo() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [score, setScore] = useState(0)
+  const [gameObjects, setGameObjects] = useState<GameObject[]>([])
+  const [playerScores, setPlayerScores] = useState<Record<number, number>>({})
+  const [playerNames, setPlayerNames] = useState<Record<number, string>>({})
   const [gameOver, setGameOver] = useState(false)
+  const [gameInProgress, setGameInProgress] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
+  const [connectionStatus, setConnectionStatus] = useState("Conectando...")
+  const [myScore, setMyScore] = useState(0)
+  const [myPlayerId, setMyPlayerId] = useState<number | null>(null)
 
-  type GameState = {
-    snake: Array<{ x: number; y: number }>
-    velocity: { x: number; y: number }
-    food: Array<{ x: number; y: number }>
-    keys: Set<string>
-    baseSpeed: number
-  }
+  const hasSentJoin = useRef(false)
+  const gameStartedTriggered = useRef(false)
 
-  const gameStateRef = useRef<GameState>({
-    snake: [
-      { x: 300, y: 300 },
-      { x: 295, y: 300 },
-      { x: 290, y: 300 },
-      { x: 285, y: 300 },
-      { x: 280, y: 300 },
-    ],
-    velocity: { x: 1.8, y: 0 },
-    food: [
-      { x: 450, y: 300 },
-      { x: 200, y: 150 },
-      { x: 600, y: 450 }
-    ],
-    keys: new Set<string>(),
-    baseSpeed: 1.8
+  const { sendMessage, isConnected } = useWebSocket("ws://localhost:12345", (message) => {
+    if (message.action === "PLAYER_ID") {
+      setMyPlayerId(message.playerId)
+      if (!gameStartedTriggered.current) {
+        gameStartedTriggered.current = true
+        sendMessage({ action: "START_GAME" })
+      }
+    } else if (message.action === "UPDATE_STATE") {
+      setGameObjects(message.objects || [])
+      setGameOver(message.gameOver || false)
+      setGameInProgress(message.gameInProgress || false)
+      setPlayerScores(message.playerScores || {})
+      setPlayerNames(message.playerNames || {})
+      if (myPlayerId !== null) {
+        setMyScore(message.playerScores?.[myPlayerId] || 0)
+      }
+    }
   })
 
+  // --- UNIÓN AL JUEGO ---
+  useEffect(() => {
+    if (isConnected && !hasSentJoin.current) {
+      setConnectionStatus("Conectado")
+      hasSentJoin.current = true
+      sendMessage({
+        action: "JOIN_GAME",
+        playerName: "Peludo"
+      })
+    } else if (!isConnected) {
+      setConnectionStatus("Desconectado")
+      hasSentJoin.current = false
+      gameStartedTriggered.current = false
+    }
+  }, [isConnected, sendMessage])
+
+  // --- CONTROLES ---
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === " ") {
+        setIsPaused(p => !p)
+        e.preventDefault()
+        return
+      }
+
+      if (gameOver && e.key === "Enter") {
+        sendMessage({ action: "RESTART_GAME" })
+        return
+      }
+
+      if (!gameInProgress || gameOver || isPaused) return
+
+      let direction: string | null = null
+      switch (e.key.toLowerCase()) {
+        case "arrowleft":
+        case "a":
+          direction = "LEFT"
+          break
+        case "arrowright":
+        case "d":
+          direction = "RIGHT"
+          break
+        case "arrowup":
+        case "w":
+          direction = "UP"
+          break
+        case "arrowdown":
+        case "s":
+          direction = "DOWN"
+          break
+      }
+
+      if (direction) {
+        e.preventDefault()
+        sendMessage({
+          action: "PLAYER_INPUT",
+          input: direction
+        })
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [gameInProgress, gameOver, isPaused, sendMessage])
+
+  // --- RENDERIZADO (TU ESTILO ORIGINAL) ---
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
 
-    const ctx = canvas.getContext('2d')
+    const ctx = canvas.getContext("2d")
     if (!ctx) return
 
-    // Controles
-    const handleKeyDown = (e: KeyboardEvent) => {
-      gameStateRef.current.keys.add(e.key.toLowerCase())
-      if (e.key === ' ') {
-        setIsPaused(p => !p)
-        e.preventDefault()
-      }
+    // Fondo
+    const gradient = ctx.createLinearGradient(0, 0, 800, 600)
+    gradient.addColorStop(0, "#0a2e0a")
+    gradient.addColorStop(1, "#0a1a0a")
+    ctx.fillStyle = gradient
+    ctx.fillRect(0, 0, 800, 600)
+
+    // Grid sutil
+    ctx.strokeStyle = "rgba(0, 100, 0, 0.2)"
+    ctx.lineWidth = 1
+    for (let i = 0; i < 800; i += 50) {
+      ctx.beginPath()
+      ctx.moveTo(i, 0)
+      ctx.lineTo(i, 600)
+      ctx.stroke()
+    }
+    for (let i = 0; i < 600; i += 50) {
+      ctx.beginPath()
+      ctx.moveTo(0, i)
+      ctx.lineTo(800, i)
+      ctx.stroke()
     }
 
-    const handleKeyUp = (e: KeyboardEvent) => {
-      gameStateRef.current.keys.delete(e.key.toLowerCase())
-    }
+    // Dibujar objetos del backend
+    gameObjects.forEach(obj => {
+      if (obj.type === "SNAKE_HEAD" || obj.type === "SNAKE_BODY") {
+        const isMySnake = obj.playerId === myPlayerId
+        const baseColor = parseColor(obj.color || "GREEN")
+        const bright = adjustBrightness(baseColor, 30)
+        const dark = adjustBrightness(baseColor, -30)
 
-    window.addEventListener('keydown', handleKeyDown)
-    window.addEventListener('keyup', handleKeyUp)
+        // Cuerpo peludo
+        const grad = ctx.createLinearGradient(obj.x, obj.y, obj.x + 16, obj.y + 16)
+        grad.addColorStop(0, bright)
+        grad.addColorStop(1, dark)
+        ctx.fillStyle = grad
+        ctx.fillRect(obj.x, obj.y, 16, 16)
 
-    // Game loop
-    let animationId: number
-    let lastTime = 0
-
-    const gameLoop = (currentTime: number) => {
-      const deltaTime = currentTime - lastTime
-      lastTime = currentTime
-
-      if (!isPaused && !gameOver) {
-        update()
-      }
-      draw(ctx)
-      animationId = requestAnimationFrame(gameLoop)
-    }
-
-    const update = () => {
-      const state = gameStateRef.current
-      const { snake, velocity, keys } = state
-      const food = state.food
-
-      const W = 800; // Ancho del Canvas
-      const H = 600; // Alto del Canvas
-      const wrapMargin = 50; // Margen de seguridad para traspaso suave
-
-      // 1. Lógica de Movimiento y Giro
-      const speedIncrease = Math.floor(score / 50) * 0.2
-      const currentSpeed = state.baseSpeed + speedIncrease
-      const turnSpeed = 0.1; // 🚀 Giro más rápido para mejor respuesta
-
-      let newAngle = Math.atan2(velocity.y, velocity.x);
-      let cardinalOverride = false;
-
-      // 🛑 1. MOVIMIENTO CARDINAL (W/S o ↑/↓) - Prioridad Alta para Subir/Bajar
-      if (keys.has('arrowup') || keys.has('w')) {
-        newAngle = -Math.PI / 2; // UP
-        cardinalOverride = true;
-      } else if (keys.has('arrowdown') || keys.has('s')) {
-        newAngle = Math.PI / 2; // DOWN
-        cardinalOverride = true;
-      }
-
-      // 🛑 2. MOVIMIENTO ANGULAR (A/D o ←/→) - Solo si W/S NO está activo
-      if (!cardinalOverride) {
-        if (keys.has('arrowleft') || keys.has('a')) {
-          newAngle -= turnSpeed; // Gira a la izquierda (counter-clockwise)
+        // Pelitos
+        ctx.strokeStyle = dark
+        ctx.lineWidth = 1
+        for (let i = 0; i < 15; i++) {
+          const px = obj.x + Math.random() * 16
+          const py = obj.y + Math.random() * 16
+          const angle = Math.random() * Math.PI * 2
+          ctx.beginPath()
+          ctx.moveTo(px, py)
+          ctx.lineTo(px + Math.cos(angle) * 4, py + Math.sin(angle) * 4)
+          ctx.stroke()
         }
-        if (keys.has('arrowright') || keys.has('d')) {
-          newAngle += turnSpeed; // Gira a la derecha (clockwise)
-        }
-      }
 
-      // Aplicar Nueva Velocidad y Dirección
-      velocity.x = Math.cos(newAngle) * currentSpeed;
-      velocity.y = Math.sin(newAngle) * currentSpeed;
+        if (obj.type === "SNAKE_HEAD") {
+          // Ojos
+          ctx.fillStyle = "#ffffff"
+          ctx.beginPath()
+          ctx.arc(obj.x + 4, obj.y + 4, 3, 0, Math.PI * 2)
+          ctx.fill()
+          ctx.beginPath()
+          ctx.arc(obj.x + 12, obj.y + 4, 3, 0, Math.PI * 2)
+          ctx.fill()
 
+          ctx.fillStyle = "#000000"
+          ctx.beginPath()
+          ctx.arc(obj.x + 4, obj.y + 4, 1.5, 0, Math.PI * 2)
+          ctx.fill()
+          ctx.beginPath()
+          ctx.arc(obj.x + 12, obj.y + 4, 1.5, 0, Math.PI * 2)
+          ctx.fill()
 
-      // Mover cabeza
-      const head = { x: snake[0].x + velocity.x, y: snake[0].y + velocity.y }
+          // Boca
+          ctx.strokeStyle = "#ef4444"
+          ctx.lineWidth = 2
+          ctx.beginPath()
+          ctx.moveTo(obj.x + 3, obj.y + 12)
+          ctx.quadraticCurveTo(obj.x + 8, obj.y + 14, obj.x + 13, obj.y + 12)
+          ctx.stroke()
 
-      // 🛑 TRASPASO DE BORDES SUAVE (Wrap Around)
-      if (head.x < -wrapMargin) head.x = W + wrapMargin;
-      if (head.x > W + wrapMargin) head.x = -wrapMargin;
-      if (head.y < -wrapMargin) head.y = H + wrapMargin;
-      if (head.y > H + wrapMargin) head.y = -wrapMargin;
-
-
-      // Verificar colisión con comida
-      for (let i = 0; i < food.length; i++) {
-        const foodItem = food[i]
-        const distToFood = Math.sqrt((head.x - foodItem.x) ** 2 + (head.y - foodItem.y) ** 2)
-        if (distToFood < 20) {
-          setScore(s => s + 10)
-          food[i] = {
-            x: Math.random() * 750 + 25,
-            y: Math.random() * 550 + 25
+          // Brillo si es mi serpiente
+          if (isMySnake) {
+            ctx.shadowBlur = 15
+            ctx.shadowColor = "#22c55e"
           }
         }
       }
 
-      // Actualizar cuerpo
-      snake.unshift(head)
-
-      const targetLength = 15 + Math.floor(score / 2)
-      while (snake.length > targetLength) {
-        snake.pop()
-      }
-
-      for (let i = 1; i < snake.length; i++) {
-        const prev = snake[i - 1]
-        const current = snake[i]
-        const dx = prev.x - current.x
-        const dy = prev.y - current.y
-        const distance = Math.sqrt(dx ** 2 + dy ** 2)
-        const targetDistance = 3
-
-        if (distance > targetDistance) {
-          const ratio = (distance - targetDistance) / distance
-          current.x += dx * ratio * 0.3
-          current.y += dy * ratio * 0.3
-        }
-      }
-
-      // La auto-colisión está eliminada por solicitud previa.
-    }
-
-    const draw = (ctx: CanvasRenderingContext2D) => {
-      const state = gameStateRef.current
-      const { snake, velocity } = state
-      const food = state.food
-
-      // Fondo y Grid
-      ctx.fillStyle = '#0a1f0a'
-      ctx.fillRect(0, 0, 800, 600)
-      ctx.strokeStyle = 'rgba(34, 197, 94, 0.05)'
-      ctx.lineWidth = 1
-      for (let i = 0; i < 800; i += 40) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 600); ctx.stroke() }
-      for (let i = 0; i < 600; i += 40) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(800, i); ctx.stroke() }
-
-      if (snake.length === 0) return
-
-      // --- DIBUJO DE SERPIENTE PELUDA ---
-
-      const drawFuzzySnakeSegment = (segment: { x: number, y: number }, r: number, color: string, blur: number, alpha: number) => {
-        ctx.shadowColor = color
-        ctx.shadowBlur = blur
-        ctx.globalAlpha = alpha
-        ctx.fillStyle = color
+      if (obj.type === "FRUIT") {
+        ctx.shadowBlur = 15
+        ctx.shadowColor = "rgba(239,68,68,0.6)"
+        ctx.fillStyle = "#ef4444"
         ctx.beginPath()
-        ctx.arc(segment.x, segment.y, r, 0, Math.PI * 2)
-        ctx.fill()
-      }
-
-      for (let i = 0; i < snake.length; i++) {
-        const segment = snake[i]
-        const t = i / snake.length
-        const radius = 14 * (1 - t * 0.4)
-
-        // Capa 1: Resplandor exterior
-        drawFuzzySnakeSegment(segment, radius, '#7ef542', 30, 0.3)
-
-        // Capa 2: Cuerpo principal
-        drawFuzzySnakeSegment(segment, radius * 0.8, '#7ef542', 20, 0.7)
-
-        // Capa 3: Highlight interior
-        drawFuzzySnakeSegment(segment, radius * 0.6, '#a3e635', 8, 0.9)
-
-        // Capa 4: Core blanco/verde
-        drawFuzzySnakeSegment(segment, radius * 0.4, '#bbf7d0', 5, 0.8)
-
-        // Dibujar el punto de conexión (para continuidad)
-        if (i > 0) {
-          const prev = snake[i - 1]
-          ctx.strokeStyle = '#a3e635';
-          ctx.lineWidth = radius * 2 * 0.8;
-          ctx.globalAlpha = 0.9;
-          ctx.beginPath();
-          ctx.moveTo(prev.x, prev.y);
-          ctx.lineTo(segment.x, segment.y);
-          ctx.stroke();
-        }
-      }
-
-      ctx.globalAlpha = 1
-      ctx.shadowBlur = 0
-
-      // Ojos (Solo en la cabeza)
-      const head = snake[0]
-      const angle = Math.atan2(velocity.y, velocity.x)
-      const eyeDistance = 10
-      const eyeSize = 5
-      const pupilSize = 3
-
-      const anglePerp = angle + Math.PI / 2;
-      const eye1X = head.x + Math.cos(anglePerp) * eyeDistance * 0.5
-      const eye1Y = head.y + Math.sin(anglePerp) * eyeDistance * 0.5
-      const eye2X = head.x - Math.cos(anglePerp) * eyeDistance * 0.5
-      const eye2Y = head.y - Math.sin(anglePerp) * eyeDistance * 0.5
-
-      // Dibuja la parte blanca del ojo
-      ctx.fillStyle = 'white'
-      ctx.beginPath()
-      ctx.arc(eye1X, eye1Y, eyeSize, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.beginPath()
-      ctx.arc(eye2X, eye2Y, eyeSize, 0, Math.PI * 2)
-      ctx.fill()
-
-      // Dibuja la pupila negra (ligeramente desplazada)
-      ctx.fillStyle = '#1a1a1a'
-      const pupilOffset = 1;
-      const pupilX = Math.cos(angle) * pupilOffset;
-      const pupilY = Math.sin(angle) * pupilOffset;
-
-      ctx.beginPath()
-      ctx.arc(eye1X + pupilX, eye1Y + pupilY, pupilSize, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.beginPath()
-      ctx.arc(eye2X + pupilX, eye2Y + pupilY, pupilSize, 0, Math.PI * 2)
-      ctx.fill()
-
-
-      // Comida (Fruta)
-      for (const foodItem of food) {
-        ctx.shadowColor = '#fbbf24'
-        ctx.shadowBlur = 25
-        ctx.fillStyle = '#fbbf24'
-        ctx.beginPath()
-        ctx.arc(foodItem.x, foodItem.y, 12, 0, Math.PI * 2)
+        ctx.arc(obj.x + 8, obj.y + 8, 10, 0, Math.PI * 2)
         ctx.fill()
 
         ctx.shadowBlur = 0
-        const foodGrad = ctx.createRadialGradient(foodItem.x - 4, foodItem.y - 4, 0, foodItem.x, foodItem.y, 12)
-        foodGrad.addColorStop(0, 'rgba(255,255,255,0.8)')
-        foodGrad.addColorStop(1, 'rgba(255,255,255,0)')
-        ctx.fillStyle = foodGrad
+        const grad = ctx.createRadialGradient(obj.x + 4, obj.y + 4, 0, obj.x + 8, obj.y + 8, 10)
+        grad.addColorStop(0, 'rgba(255,255,255,0.8)')
+        grad.addColorStop(1, 'rgba(255,255,255,0)')
+        ctx.fillStyle = grad
         ctx.beginPath()
-        ctx.arc(foodItem.x, foodItem.y, 12, 0, Math.PI * 2)
+        ctx.arc(obj.x + 8, obj.y + 8, 10, 0, Math.PI * 2)
         ctx.fill()
 
         // Tallo
         ctx.fillStyle = '#84cc16'
-        ctx.fillRect(foodItem.x - 2, foodItem.y - 16, 4, 8)
+        ctx.fillRect(obj.x + 6, obj.y - 4, 4, 8)
+
+        // Valor
+        ctx.fillStyle = '#ffffff'
+        ctx.font = 'bold 12px Arial'
+        const value = obj.health?.toString() || '1'
+        const metrics = ctx.measureText(value)
+        ctx.fillText(value, obj.x + (16 - metrics.width) / 2, obj.y + 11)
       }
-    }
 
-    animationId = requestAnimationFrame(gameLoop)
+      if (obj.type === "WALL") {
+        ctx.fillStyle = "#666666"
+        ctx.fillRect(obj.x, obj.y, 16, 16)
+      }
+    })
 
-    return () => {
-      cancelAnimationFrame(animationId)
-      window.removeEventListener('keydown', handleKeyDown)
-      window.removeEventListener('keyup', handleKeyUp)
-    }
-  }, [isPaused, gameOver, score])
+    ctx.shadowBlur = 0
+  }, [gameObjects, myPlayerId])
 
-  const restart = () => {
-    gameStateRef.current = {
-      snake: [
-        { x: 300, y: 300 },
-        { x: 295, y: 295 },
-        { x: 290, y: 290 },
-        { x: 285, y: 285 },
-        { x: 280, y: 280 },
-      ],
-      velocity: { x: 1.8, y: 0 },
-      food: [
-        { x: 450, y: 300 },
-        { x: 200, y: 150 },
-        { x: 600, y: 450 }
-      ],
-      keys: new Set<string>(),
-      baseSpeed: 1.8
+  const parseColor = (colorName: string) => {
+    const colors: Record<string, string> = {
+      CYAN: "#06b6d4",
+      MAGENTA: "#d946ef",
+      YELLOW: "#eab308",
+      ORANGE: "#f97316",
+      PINK: "#ec4899",
+      GREEN: "#22c55e",
+      BLUE: "#3b82f6",
+      RED: "#ef4444",
+      WHITE: "#ffffff"
     }
-    setScore(0)
-    setGameOver(false)
-    setIsPaused(false)
+    return colors[colorName.toUpperCase()] || "#22c55e"
+  }
+
+  const adjustBrightness = (hex: string, percent: number): string => {
+    hex = hex.replace(/^#/, '')
+    let r = parseInt(hex.substring(0, 2), 16)
+    let g = parseInt(hex.substring(2, 4), 16)
+    let b = parseInt(hex.substring(4, 6), 16)
+
+    r = Math.min(255, Math.max(0, r + (r * percent / 100)))
+    g = Math.min(255, Math.max(0, g + (g * percent / 100)))
+    b = Math.min(255, Math.max(0, b + (b * percent / 100)))
+
+    return `#${Math.round(r).toString(16).padStart(2, '0')}${Math.round(g).toString(16).padStart(2, '0')}${Math.round(b).toString(16).padStart(2, '0')}`
   }
 
   return (
@@ -320,12 +279,15 @@ export default function SnakePeludo() {
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-300 to-emerald-400">
-              🐍 SERPIENTE PELUDA
+              Snacke Game
             </h1>
             <p className="text-green-400/70 text-sm mt-1">Usa ← → / A D para girar. ↑ ↓ / W S para subir/bajar.</p>
+            <p className="text-xs text-gray-400 mt-1">
+              Estado: <span className={isConnected ? "text-green-500" : "text-red-500"}>{connectionStatus}</span>
+            </p>
           </div>
           <div className="text-right">
-            <div className="text-5xl font-black text-green-300">{score}</div>
+            <div className="text-5xl font-black text-green-300">{myScore}</div>
             <div className="text-xs text-green-400/70">PUNTOS</div>
           </div>
         </div>
@@ -345,12 +307,12 @@ export default function SnakePeludo() {
             <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center rounded-2xl">
               <div className="text-center space-y-4">
                 <div className="text-6xl font-black text-red-400">¡GAME OVER!</div>
-                <div className="text-3xl text-green-300">Puntuación: {score}</div>
+                <div className="text-3xl text-green-300">Puntuación: {myScore}</div>
                 <button
-                  onClick={restart}
+                  onClick={() => sendMessage({ action: "RESTART_GAME" })}
                   className="px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold text-xl rounded-xl shadow-lg hover:scale-105 transition-transform"
                 >
-                  🔄 Jugar de Nuevo
+                  Jugar de Nuevo
                 </button>
               </div>
             </div>
@@ -358,7 +320,7 @@ export default function SnakePeludo() {
 
           {isPaused && !gameOver && (
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center rounded-2xl">
-              <div className="text-6xl font-black text-green-300">⏸️ PAUSADO</div>
+              <div className="text-6xl font-black text-green-300">PAUSADO</div>
             </div>
           )}
         </div>
