@@ -8,14 +8,10 @@ interface SnakeGameProps {
   onBack: () => void
 }
 
-const GRID_SIZE = 20
-const CELL_SIZE = 20
-
-interface PlayerStats {
-  gamesPlayed: number
-  highScore: number
-  totalScore: number
-}
+const CANVAS_WIDTH = 600
+const CANVAS_HEIGHT = 600
+const SEGMENT_SIZE = 15
+const SEGMENT_SPACING = 8
 
 interface Position {
   x: number
@@ -26,8 +22,14 @@ type Direction = "UP" | "DOWN" | "LEFT" | "RIGHT"
 
 export default function SnakeGame({ player, onBack }: SnakeGameProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [snake, setSnake] = useState<Position[]>([{ x: 10, y: 10 }])
-  const [food, setFood] = useState<Position>({ x: 15, y: 15 })
+  const [snake, setSnake] = useState<Position[]>([
+    { x: 300, y: 300 },
+    { x: 292, y: 300 },
+    { x: 284, y: 300 },
+    { x: 276, y: 300 },
+    { x: 268, y: 300 },
+  ])
+  const [food, setFood] = useState<Position>({ x: 400, y: 400 })
   const [direction, setDirection] = useState<Direction>("RIGHT")
   const [nextDirection, setNextDirection] = useState<Direction>("RIGHT")
   const [score, setScore] = useState(0)
@@ -35,25 +37,26 @@ export default function SnakeGame({ player, onBack }: SnakeGameProps) {
   const [isPaused, setIsPaused] = useState(false)
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null)
   const gameLoopRef = useRef<NodeJS.Timeout | null>(null)
+  const speed = 3
 
   // Generate random food position
   const generateFood = useCallback(() => {
     return {
-      x: Math.floor(Math.random() * GRID_SIZE),
-      y: Math.floor(Math.random() * GRID_SIZE),
+      x: Math.random() * (CANVAS_WIDTH - 40) + 20,
+      y: Math.random() * (CANVAS_HEIGHT - 40) + 20,
     }
   }, [])
 
-  // Guardar estadísticas cuando termina el juego
+  // Guardar estadísticas
   useEffect(() => {
     if (gameOver && score > 0) {
       const statsKey = `player-stats-${player.id}`
       const savedStats = localStorage.getItem(statsKey)
-      const currentStats: PlayerStats = savedStats
+      const currentStats = savedStats
         ? JSON.parse(savedStats)
         : { gamesPlayed: 0, highScore: 0, totalScore: 0 }
 
-      const newStats: PlayerStats = {
+      const newStats = {
         gamesPlayed: currentStats.gamesPlayed + 1,
         highScore: Math.max(currentStats.highScore, score),
         totalScore: currentStats.totalScore + score,
@@ -68,16 +71,16 @@ export default function SnakeGame({ player, onBack }: SnakeGameProps) {
     const handleKeyPress = (e: KeyboardEvent) => {
       const key = e.key.toUpperCase()
       if (key === "ARROWUP" || key === "W") {
-        setNextDirection("UP")
+        if (direction !== "DOWN") setNextDirection("UP")
         e.preventDefault()
       } else if (key === "ARROWDOWN" || key === "S") {
-        setNextDirection("DOWN")
+        if (direction !== "UP") setNextDirection("DOWN")
         e.preventDefault()
       } else if (key === "ARROWLEFT" || key === "A") {
-        setNextDirection("LEFT")
+        if (direction !== "RIGHT") setNextDirection("LEFT")
         e.preventDefault()
       } else if (key === "ARROWRIGHT" || key === "D") {
-        setNextDirection("RIGHT")
+        if (direction !== "LEFT") setNextDirection("RIGHT")
         e.preventDefault()
       } else if (key === " ") {
         setIsPaused((prev) => !prev)
@@ -87,9 +90,9 @@ export default function SnakeGame({ player, onBack }: SnakeGameProps) {
 
     window.addEventListener("keydown", handleKeyPress)
     return () => window.removeEventListener("keydown", handleKeyPress)
-  }, [])
+  }, [direction])
 
-  // Handle touch controls for mobile
+  // Handle touch controls
   const handleTouchStart = (e: React.TouchEvent) => {
     const touch = e.touches[0]
     setTouchStart({ x: touch.clientX, y: touch.clientY })
@@ -104,14 +107,18 @@ export default function SnakeGame({ player, onBack }: SnakeGameProps) {
     const minSwipeDistance = 30
 
     if (Math.abs(deltaX) > Math.abs(deltaY)) {
-      // Horizontal swipe
       if (Math.abs(deltaX) > minSwipeDistance) {
-        setNextDirection(deltaX > 0 ? "RIGHT" : "LEFT")
+        const newDir = deltaX > 0 ? "RIGHT" : "LEFT"
+        if ((newDir === "RIGHT" && direction !== "LEFT") || (newDir === "LEFT" && direction !== "RIGHT")) {
+          setNextDirection(newDir)
+        }
       }
     } else {
-      // Vertical swipe
       if (Math.abs(deltaY) > minSwipeDistance) {
-        setNextDirection(deltaY > 0 ? "DOWN" : "UP")
+        const newDir = deltaY > 0 ? "DOWN" : "UP"
+        if ((newDir === "DOWN" && direction !== "UP") || (newDir === "UP" && direction !== "DOWN")) {
+          setNextDirection(newDir)
+        }
       }
     }
 
@@ -124,62 +131,85 @@ export default function SnakeGame({ player, onBack }: SnakeGameProps) {
 
     gameLoopRef.current = setInterval(() => {
       setSnake((prevSnake) => {
-        let newDirection = nextDirection
-
-        // Prevent reversing into itself
-        if (
-          (newDirection === "UP" && direction === "DOWN") ||
-          (newDirection === "DOWN" && direction === "UP") ||
-          (newDirection === "LEFT" && direction === "RIGHT") ||
-          (newDirection === "RIGHT" && direction === "LEFT")
-        ) {
-          newDirection = direction
-        }
-
-        setDirection(newDirection)
+        setDirection(nextDirection)
 
         const head = prevSnake[0]
-        const newHead: Position = { ...head }
+        let newHead: Position = { ...head }
 
-        switch (newDirection) {
+        switch (nextDirection) {
           case "UP":
-            newHead.y = (head.y - 1 + GRID_SIZE) % GRID_SIZE
+            newHead.y -= speed
             break
           case "DOWN":
-            newHead.y = (head.y + 1) % GRID_SIZE
+            newHead.y += speed
             break
           case "LEFT":
-            newHead.x = (head.x - 1 + GRID_SIZE) % GRID_SIZE
+            newHead.x -= speed
             break
           case "RIGHT":
-            newHead.x = (head.x + 1) % GRID_SIZE
+            newHead.x += speed
             break
         }
 
-        // Check collision with self
-        if (prevSnake.some((segment) => segment.x === newHead.x && segment.y === newHead.y)) {
+        // Colisión con paredes
+        if (newHead.x < 0 || newHead.x > CANVAS_WIDTH || newHead.y < 0 || newHead.y > CANVAS_HEIGHT) {
           setGameOver(true)
           return prevSnake
         }
 
-        const newSnake = [newHead, ...prevSnake]
+        // Colisión consigo mismo
+        for (let i = 3; i < prevSnake.length; i++) {
+          const segment = prevSnake[i]
+          const dist = Math.sqrt(Math.pow(newHead.x - segment.x, 2) + Math.pow(newHead.y - segment.y, 2))
+          if (dist < SEGMENT_SIZE) {
+            setGameOver(true)
+            return prevSnake
+          }
+        }
 
-        // Check if food eaten
-        if (newHead.x === food.x && newHead.y === food.y) {
+        const newSnake = [newHead]
+
+        // Seguir la cabeza con el resto del cuerpo
+        for (let i = 0; i < prevSnake.length - 1; i++) {
+          const current = prevSnake[i]
+          const next = prevSnake[i + 1]
+
+          const dx = current.x - next.x
+          const dy = current.y - next.y
+          const dist = Math.sqrt(dx * dx + dy * dy)
+
+          if (dist > SEGMENT_SPACING) {
+            const ratio = SEGMENT_SPACING / dist
+            newSnake.push({
+              x: current.x - dx * ratio,
+              y: current.y - dy * ratio,
+            })
+          } else {
+            newSnake.push(next)
+          }
+        }
+
+        // Verificar si comió la comida
+        const distToFood = Math.sqrt(Math.pow(newHead.x - food.x, 2) + Math.pow(newHead.y - food.y, 2))
+        if (distToFood < SEGMENT_SIZE + 5) {
           setScore((prev) => prev + 10)
           setFood(generateFood())
-        } else {
-          newSnake.pop()
+
+          // Agregar segmentos al comer
+          for (let i = 0; i < 3; i++) {
+            const lastSegment = newSnake[newSnake.length - 1]
+            newSnake.push({ ...lastSegment })
+          }
         }
 
         return newSnake
       })
-    }, 100)
+    }, 20)
 
     return () => {
       if (gameLoopRef.current) clearInterval(gameLoopRef.current)
     }
-  }, [direction, nextDirection, food, gameOver, isPaused, generateFood])
+  }, [nextDirection, food, gameOver, isPaused, generateFood])
 
   // Draw game
   useEffect(() => {
@@ -189,51 +219,172 @@ export default function SnakeGame({ player, onBack }: SnakeGameProps) {
     const ctx = canvas.getContext("2d")
     if (!ctx) return
 
-    // Clear canvas - fondo verde oscuro
-    ctx.fillStyle = "#0d3b1a"
+    // Fondo oscuro
+    ctx.fillStyle = "#0a2410"
     ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-    // Draw grid con líneas verde oscuro
-    ctx.strokeStyle = "#1a5c2e"
-    ctx.lineWidth = 0.5
-    for (let i = 0; i <= GRID_SIZE; i++) {
+    // Dibujar serpiente con círculos superpuestos para efecto fluido
+    if (snake.length > 0) {
+      // Primero dibujamos círculos a lo largo del camino para crear cuerpo grueso
+      const drawSnakePath = (width: number, color: string, blur: number) => {
+        ctx.shadowColor = color
+        ctx.shadowBlur = blur
+        ctx.fillStyle = color
+
+        // Dibujar círculos en cada segmento
+        snake.forEach((segment, index) => {
+          ctx.beginPath()
+          ctx.arc(segment.x, segment.y, width, 0, Math.PI * 2)
+          ctx.fill()
+        })
+
+        // Dibujar círculos interpolados entre segmentos para suavizar
+        for (let i = 0; i < snake.length - 1; i++) {
+          const current = snake[i]
+          const next = snake[i + 1]
+          const steps = 3
+
+          for (let j = 1; j < steps; j++) {
+            const t = j / steps
+            const x = current.x + (next.x - current.x) * t
+            const y = current.y + (next.y - current.y) * t
+
+            ctx.beginPath()
+            ctx.arc(x, y, width, 0, Math.PI * 2)
+            ctx.fill()
+          }
+        }
+      }
+
+      // Capa 1: Resplandor exterior muy suave
+      drawSnakePath(SEGMENT_SIZE * 1.8, "#7ef542", 30)
+
+      // Capa 2: Cuerpo principal brillante
+      drawSnakePath(SEGMENT_SIZE * 1.4, "#7ef542", 20)
+
+      // Capa 3: Highlight verde claro
+      drawSnakePath(SEGMENT_SIZE * 1.1, "#a3e635", 12)
+
+      // Capa 4: Centro brillante
+      drawSnakePath(SEGMENT_SIZE * 0.8, "#bbf7d0", 8)
+
+      // Capa 5: Brillo central blanco
+      ctx.shadowBlur = 0
+      ctx.fillStyle = "rgba(255, 255, 255, 0.5)"
+      snake.forEach((segment) => {
+        const gradient = ctx.createRadialGradient(
+          segment.x - SEGMENT_SIZE * 0.3,
+          segment.y - SEGMENT_SIZE * 0.3,
+          0,
+          segment.x,
+          segment.y,
+          SEGMENT_SIZE * 0.6
+        )
+        gradient.addColorStop(0, "rgba(255, 255, 255, 0.6)")
+        gradient.addColorStop(1, "rgba(255, 255, 255, 0)")
+        ctx.fillStyle = gradient
+        ctx.beginPath()
+        ctx.arc(segment.x, segment.y, SEGMENT_SIZE * 0.6, 0, Math.PI * 2)
+        ctx.fill()
+      })
+
+      // Dibujar cabeza con ojos
+      ctx.shadowBlur = 0
+      const head = snake[0]
+
+      // Determinar dirección de los ojos
+      let eyeAngle = 0
+      if (direction === "RIGHT") eyeAngle = 0
+      else if (direction === "DOWN") eyeAngle = Math.PI / 2
+      else if (direction === "LEFT") eyeAngle = Math.PI
+      else if (direction === "UP") eyeAngle = -Math.PI / 2
+
+      const eyeDistance = SEGMENT_SIZE * 0.6
+      const eyeSize = SEGMENT_SIZE * 0.4
+      const pupilSize = SEGMENT_SIZE * 0.2
+
+      const eye1X = head.x + Math.cos(eyeAngle + Math.PI / 6) * eyeDistance
+      const eye1Y = head.y + Math.sin(eyeAngle + Math.PI / 6) * eyeDistance
+      const eye2X = head.x + Math.cos(eyeAngle - Math.PI / 6) * eyeDistance
+      const eye2Y = head.y + Math.sin(eyeAngle - Math.PI / 6) * eyeDistance
+
+      // Ojo 1 con borde
+      ctx.strokeStyle = "rgba(0, 0, 0, 0.3)"
+      ctx.lineWidth = 2
+      ctx.fillStyle = "white"
       ctx.beginPath()
-      ctx.moveTo(i * CELL_SIZE, 0)
-      ctx.lineTo(i * CELL_SIZE, canvas.height)
+      ctx.arc(eye1X, eye1Y, eyeSize, 0, Math.PI * 2)
+      ctx.fill()
       ctx.stroke()
 
+      ctx.fillStyle = "black"
       ctx.beginPath()
-      ctx.moveTo(0, i * CELL_SIZE)
-      ctx.lineTo(canvas.width, i * CELL_SIZE)
+      ctx.arc(eye1X + eyeSize * 0.1, eye1Y, pupilSize, 0, Math.PI * 2)
+      ctx.fill()
+
+      // Brillo en ojo
+      ctx.fillStyle = "rgba(255, 255, 255, 0.6)"
+      ctx.beginPath()
+      ctx.arc(eye1X - eyeSize * 0.2, eye1Y - eyeSize * 0.2, pupilSize * 0.4, 0, Math.PI * 2)
+      ctx.fill()
+
+      // Ojo 2 con borde
+      ctx.fillStyle = "white"
+      ctx.beginPath()
+      ctx.arc(eye2X, eye2Y, eyeSize, 0, Math.PI * 2)
+      ctx.fill()
       ctx.stroke()
+
+      ctx.fillStyle = "black"
+      ctx.beginPath()
+      ctx.arc(eye2X + eyeSize * 0.1, eye2Y, pupilSize, 0, Math.PI * 2)
+      ctx.fill()
+
+      // Brillo en ojo
+      ctx.fillStyle = "rgba(255, 255, 255, 0.6)"
+      ctx.beginPath()
+      ctx.arc(eye2X - eyeSize * 0.2, eye2Y - eyeSize * 0.2, pupilSize * 0.4, 0, Math.PI * 2)
+      ctx.fill()
     }
 
-    // Draw snake
-    snake.forEach((segment, index) => {
-      if (index === 0) {
-        // Head - verde brillante
-        ctx.fillStyle = "#10b981"
-        ctx.shadowColor = "#10b981"
-        ctx.shadowBlur = 15
-      } else {
-        // Body - verde medio
-        ctx.fillStyle = "#059669"
-        ctx.shadowColor = "transparent"
-      }
-      ctx.fillRect(segment.x * CELL_SIZE + 1, segment.y * CELL_SIZE + 1, CELL_SIZE - 2, CELL_SIZE - 2)
-    })
-
-    // Draw food - amarillo dorado
-    ctx.fillStyle = "#fbbf24"
+    // Dibujar comida
     ctx.shadowColor = "#fbbf24"
-    ctx.shadowBlur = 12
+    ctx.shadowBlur = 20
+    ctx.fillStyle = "#fbbf24"
     ctx.beginPath()
-    ctx.arc(food.x * CELL_SIZE + CELL_SIZE / 2, food.y * CELL_SIZE + CELL_SIZE / 2, CELL_SIZE / 2 - 2, 0, Math.PI * 2)
+    ctx.arc(food.x, food.y, 10, 0, Math.PI * 2)
     ctx.fill()
-  }, [snake, food])
+
+    // Highlight en comida
+    ctx.shadowBlur = 0
+    const foodGradient = ctx.createRadialGradient(
+      food.x - 3,
+      food.y - 3,
+      0,
+      food.x,
+      food.y,
+      10
+    )
+    foodGradient.addColorStop(0, "rgba(255, 255, 255, 0.6)")
+    foodGradient.addColorStop(1, "rgba(255, 255, 255, 0)")
+    ctx.fillStyle = foodGradient
+    ctx.beginPath()
+    ctx.arc(food.x, food.y, 10, 0, Math.PI * 2)
+    ctx.fill()
+
+    ctx.fillStyle = "#a3e635"
+    ctx.fillRect(food.x - 1, food.y - 12, 2, 5)
+
+  }, [snake, food, direction])
 
   const handleRestart = () => {
-    setSnake([{ x: 10, y: 10 }])
+    setSnake([
+      { x: 300, y: 300 },
+      { x: 292, y: 300 },
+      { x: 284, y: 300 },
+      { x: 276, y: 300 },
+      { x: 268, y: 300 },
+    ])
     setFood(generateFood())
     setDirection("RIGHT")
     setNextDirection("RIGHT")
@@ -245,7 +396,6 @@ export default function SnakeGame({ player, onBack }: SnakeGameProps) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-900 via-green-800 to-emerald-900 p-3 sm:p-4 md:p-6 flex items-center justify-center">
       <div className="w-full max-w-4xl mx-auto">
-        {/* Header */}
         <div className="flex justify-between items-center mb-3 sm:mb-4 md:mb-6">
           <div>
             <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 to-green-200">
@@ -262,22 +412,19 @@ export default function SnakeGame({ player, onBack }: SnakeGameProps) {
           </Button>
         </div>
 
-        {/* Game Container */}
         <div className="bg-green-950/60 backdrop-blur-md border border-emerald-400/30 rounded-xl p-3 sm:p-4 md:p-6 mb-3 sm:mb-4 md:mb-6 shadow-2xl">
           <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 md:gap-6">
-            {/* Canvas */}
             <div className="flex-1">
               <canvas
                 ref={canvasRef}
-                width={GRID_SIZE * CELL_SIZE}
-                height={GRID_SIZE * CELL_SIZE}
-                className="w-full max-w-full aspect-square border-2 border-emerald-500/30 rounded-lg shadow-lg"
+                width={CANVAS_WIDTH}
+                height={CANVAS_HEIGHT}
+                className="w-full max-w-full aspect-square border-2 border-emerald-500/30 rounded-lg shadow-lg bg-[#0a2410]"
                 onTouchStart={handleTouchStart}
                 onTouchEnd={handleTouchEnd}
               />
             </div>
 
-            {/* Stats Sidebar */}
             <div className="flex lg:flex-col gap-3 sm:gap-4 lg:w-32">
               <div className="flex-1 lg:flex-none bg-green-900/50 backdrop-blur-sm rounded-lg p-3 sm:p-4 text-center border border-emerald-400/20">
                 <p className="text-xs text-green-200/70 mb-1">Puntuación</p>
@@ -299,7 +446,6 @@ export default function SnakeGame({ player, onBack }: SnakeGameProps) {
           </div>
         </div>
 
-        {/* Controls */}
         <div className="space-y-3">
           {gameOver && (
             <div className="bg-red-500/20 backdrop-blur-sm border border-red-400/40 rounded-lg p-3 sm:p-4 text-center">
