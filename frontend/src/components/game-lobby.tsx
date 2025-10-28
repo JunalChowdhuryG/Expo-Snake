@@ -77,7 +77,7 @@ export default function GameLobby({ player, onStartGame, onLogout }: GameLobbyPr
         {/* Guía de Juego */}
         <div className="bg-green-950/60 backdrop-blur-md border border-emerald-400/30 rounded-xl sm:rounded-2xl p-4 sm:p-6 md:p-8 mb-4 sm:mb-6 shadow-xl">
           <h3 className="text-lg sm:text-xl font-bold text-white mb-4 sm:mb-6 flex items-center gap-2 justify-center sm:justify-start">
-            <span className="text-xl sm:text-2xl">🎮</span>
+            <span className="text-xl sm:tfext-2xl">🎮</span>
             Cómo Jugar
           </h3>
           <ul className="space-y-3 sm:space-y-4 text-sm sm:text-base text-green-100">

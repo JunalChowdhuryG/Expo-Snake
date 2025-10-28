@@ -1,337 +1,366 @@
-"use client"
+import { useState, useEffect, useRef } from 'react'
+import { Button } from '@/components/ui/button'
 
-import { useState, useEffect, useRef, useCallback } from "react"
-import { Button } from "@/components/ui/button"
-
-interface SnakeGameProps {
-  player: { id: string; name: string }
-  onBack: () => void
-}
-
-const GRID_SIZE = 20
-const CELL_SIZE = 20
-
-interface Position {
-  x: number
-  y: number
-}
-
-type Direction = "UP" | "DOWN" | "LEFT" | "RIGHT"
-
-export default function SnakeGame({ player, onBack }: SnakeGameProps) {
+export default function SnakePeludo() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [snake, setSnake] = useState<Position[]>([{ x: 10, y: 10 }])
-  const [food, setFood] = useState<Position>({ x: 15, y: 15 })
-  const [direction, setDirection] = useState<Direction>("RIGHT")
-  const [nextDirection, setNextDirection] = useState<Direction>("RIGHT")
   const [score, setScore] = useState(0)
   const [gameOver, setGameOver] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
-  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null)
-  const gameLoopRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Generate random food position
-  const generateFood = useCallback(() => {
-    let newFood: Position
-    do {
-      newFood = {
-        x: Math.floor(Math.random() * GRID_SIZE),
-        y: Math.floor(Math.random() * GRID_SIZE),
-      }
-    } while (snake.some((segment) => segment.x === newFood.x && segment.y === newFood.y))
-    return newFood
-  }, [snake])
-
-  // Lógica para guardar estadísticas al terminar (necesaria para el Lobby)
-  useEffect(() => {
-    if (gameOver && score > 0) {
-      const statsKey = `player-stats-${player.id}`
-      const savedStats = localStorage.getItem(statsKey)
-      const currentStats = savedStats
-        ? JSON.parse(savedStats)
-        : { gamesPlayed: 0, highScore: 0, totalScore: 0 }
-
-      const newStats = {
-        gamesPlayed: currentStats.gamesPlayed + 1,
-        highScore: Math.max(currentStats.highScore, score),
-        totalScore: currentStats.totalScore + score,
-      }
-
-      localStorage.setItem(statsKey, JSON.stringify(newStats))
-    }
-  }, [gameOver, score, player.id])
-
-  // Handle keyboard input (sin cambios)
-  useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      const key = e.key.toUpperCase()
-      if (key === "ARROWUP" || key === "W") {
-        setNextDirection("UP")
-        e.preventDefault()
-      } else if (key === "ARROWDOWN" || key === "S") {
-        setNextDirection("DOWN")
-        e.preventDefault()
-      } else if (key === "ARROWLEFT" || key === "A") {
-        setNextDirection("LEFT")
-        e.preventDefault()
-      } else if (key === "ARROWRIGHT" || key === "D") {
-        setNextDirection("RIGHT")
-        e.preventDefault()
-      } else if (key === " ") {
-        setIsPaused((prev) => !prev)
-        e.preventDefault()
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyPress)
-    return () => window.removeEventListener("keydown", handleKeyPress)
-  }, [])
-
-  // Handle touch controls for mobile (sin cambios)
-  const handleTouchStart = (e: React.TouchEvent) => {
-    const touch = e.touches[0]
-    setTouchStart({ x: touch.clientX, y: touch.clientY })
+  type GameState = {
+    snake: Array<{ x: number; y: number }>
+    velocity: { x: number; y: number }
+    food: Array<{ x: number; y: number }>
+    keys: Set<string>
+    baseSpeed: number
   }
 
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (!touchStart) return
+  const gameStateRef = useRef<GameState>({
+    snake: [
+      { x: 300, y: 300 },
+      { x: 295, y: 300 },
+      { x: 290, y: 300 },
+      { x: 285, y: 300 },
+      { x: 280, y: 300 },
+    ],
+    velocity: { x: 1.8, y: 0 },
+    food: [
+      { x: 450, y: 300 },
+      { x: 200, y: 150 },
+      { x: 600, y: 450 }
+    ],
+    keys: new Set<string>(),
+    baseSpeed: 1.8
+  })
 
-    const touch = e.changedTouches[0]
-    const deltaX = touch.clientX - touchStart.x
-    const deltaY = touch.clientY - touchStart.y
-    const minSwipeDistance = 30
-
-    if (Math.abs(deltaX) > Math.abs(deltaY)) {
-      if (Math.abs(deltaX) > minSwipeDistance) {
-        setNextDirection(deltaX > 0 ? "RIGHT" : "LEFT")
-      }
-    } else {
-      if (Math.abs(deltaY) > minSwipeDistance) {
-        setNextDirection(deltaY > 0 ? "DOWN" : "UP")
-      }
-    }
-
-    setTouchStart(null)
-  }
-
-  // Game loop (sin cambios)
-  useEffect(() => {
-    if (gameOver || isPaused) return
-
-    gameLoopRef.current = setInterval(() => {
-      setSnake((prevSnake) => {
-        let newDirection = nextDirection
-
-        if (
-          (newDirection === "UP" && direction === "DOWN") ||
-          (newDirection === "DOWN" && direction === "UP") ||
-          (newDirection === "LEFT" && direction === "RIGHT") ||
-          (newDirection === "RIGHT" && direction === "LEFT")
-        ) {
-          newDirection = direction
-        }
-
-        setDirection(newDirection)
-
-        const head = prevSnake[0]
-        const newHead: Position = { ...head }
-
-        switch (newDirection) {
-          case "UP":
-            newHead.y = (head.y - 1 + GRID_SIZE) % GRID_SIZE
-            break
-          case "DOWN":
-            newHead.y = (head.y + 1) % GRID_SIZE
-            break
-          case "LEFT":
-            newHead.x = (head.x - 1 + GRID_SIZE) % GRID_SIZE
-            break
-          case "RIGHT":
-            newHead.x = (head.x + 1) % GRID_SIZE
-            break
-        }
-
-        if (prevSnake.some((segment) => segment.x === newHead.x && segment.y === newHead.y)) {
-          setGameOver(true)
-          return prevSnake
-        }
-
-        const newSnake = [newHead, ...prevSnake]
-
-        if (newHead.x === food.x && newHead.y === food.y) {
-          setScore((prev) => prev + 10)
-          setFood(generateFood())
-        } else {
-          newSnake.pop()
-        }
-
-        return newSnake
-      })
-    }, 100)
-
-    return () => {
-      if (gameLoopRef.current) clearInterval(gameLoopRef.current)
-    }
-  }, [direction, nextDirection, food, gameOver, isPaused, generateFood])
-
-  // Draw game (Lógica de dibujo actualizada)
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
 
-    const ctx = canvas.getContext("2d")
+    const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    // 1. Fondo Verde Oscuro (Requisito: Fondo Verde)
-    ctx.fillStyle = "#0d3b1a" // Verde Oscuro
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
-
-    // 2. Dibujar cuadrícula sutil
-    ctx.strokeStyle = "#1a5c2e"
-    ctx.lineWidth = 0.5
-    for (let i = 0; i <= GRID_SIZE; i++) {
-      ctx.beginPath()
-      ctx.moveTo(i * CELL_SIZE, 0)
-      ctx.lineTo(i * CELL_SIZE, canvas.height)
-      ctx.stroke()
-
-      ctx.beginPath()
-      ctx.moveTo(0, i * CELL_SIZE)
-      ctx.lineTo(canvas.width, i * CELL_SIZE)
-      ctx.stroke()
+    // Controles
+    const handleKeyDown = (e: KeyboardEvent) => {
+      gameStateRef.current.keys.add(e.key.toLowerCase())
+      if (e.key === ' ') {
+        setIsPaused(p => !p)
+        e.preventDefault()
+      }
     }
 
-    // 3. Dibujar Serpiente
-    snake.forEach((segment, index) => {
-      if (index === 0) {
-        // Cabeza - Verde brillante con sombra
-        ctx.fillStyle = "#10b981"
-        ctx.shadowColor = "#10b981"
-        ctx.shadowBlur = 15
-      } else {
-        // Cuerpo - Verde medio
-        ctx.fillStyle = "#059669"
-        ctx.shadowColor = "transparent"
+    const handleKeyUp = (e: KeyboardEvent) => {
+      gameStateRef.current.keys.delete(e.key.toLowerCase())
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('keyup', handleKeyUp)
+
+    // Game loop
+    let animationId: number
+    let lastTime = 0
+
+    const gameLoop = (currentTime: number) => {
+      const deltaTime = currentTime - lastTime
+      lastTime = currentTime
+
+      if (!isPaused && !gameOver) {
+        update()
       }
-      ctx.fillRect(segment.x * CELL_SIZE + 1, segment.y * CELL_SIZE + 1, CELL_SIZE - 2, CELL_SIZE - 2)
-    })
+      draw(ctx)
+      animationId = requestAnimationFrame(gameLoop)
+    }
 
-    // 4. Dibujar Fruta (Requisito: Agregar frutas - estilizado como fruta)
-    ctx.fillStyle = "#fbbf24" // Amarillo Dorado (Color de fruta/manzana)
-    ctx.shadowColor = "#fbbf24"
-    ctx.shadowBlur = 12
-    ctx.beginPath()
-    ctx.arc(food.x * CELL_SIZE + CELL_SIZE / 2, food.y * CELL_SIZE + CELL_SIZE / 2, CELL_SIZE / 2 - 3, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.shadowBlur = 0
+    const update = () => {
+      const state = gameStateRef.current
+      const { snake, velocity, keys } = state
+      const food = state.food
 
-    // Simular un pequeño tallo verde
-    ctx.fillStyle = "#a3e635"
-    ctx.fillRect(food.x * CELL_SIZE + CELL_SIZE / 2 - 1, food.y * CELL_SIZE + 2, 2, 4);
+      const W = 800; // Ancho del Canvas
+      const H = 600; // Alto del Canvas
+      const wrapMargin = 50; // Margen de seguridad para traspaso suave
 
-  }, [snake, food])
+      // 1. Lógica de Movimiento y Giro
+      const speedIncrease = Math.floor(score / 50) * 0.2
+      const currentSpeed = state.baseSpeed + speedIncrease
+      const turnSpeed = 0.1; // 🚀 Giro más rápido para mejor respuesta
 
-  const handleRestart = () => {
-    setSnake([{ x: 10, y: 10 }])
-    setFood(generateFood())
-    setDirection("RIGHT")
-    setNextDirection("RIGHT")
+      let newAngle = Math.atan2(velocity.y, velocity.x);
+      let cardinalOverride = false;
+
+      // 🛑 1. MOVIMIENTO CARDINAL (W/S o ↑/↓) - Prioridad Alta para Subir/Bajar
+      if (keys.has('arrowup') || keys.has('w')) {
+        newAngle = -Math.PI / 2; // UP
+        cardinalOverride = true;
+      } else if (keys.has('arrowdown') || keys.has('s')) {
+        newAngle = Math.PI / 2; // DOWN
+        cardinalOverride = true;
+      }
+
+      // 🛑 2. MOVIMIENTO ANGULAR (A/D o ←/→) - Solo si W/S NO está activo
+      if (!cardinalOverride) {
+        if (keys.has('arrowleft') || keys.has('a')) {
+          newAngle -= turnSpeed; // Gira a la izquierda (counter-clockwise)
+        }
+        if (keys.has('arrowright') || keys.has('d')) {
+          newAngle += turnSpeed; // Gira a la derecha (clockwise)
+        }
+      }
+
+      // Aplicar Nueva Velocidad y Dirección
+      velocity.x = Math.cos(newAngle) * currentSpeed;
+      velocity.y = Math.sin(newAngle) * currentSpeed;
+
+
+      // Mover cabeza
+      const head = { x: snake[0].x + velocity.x, y: snake[0].y + velocity.y }
+
+      // 🛑 TRASPASO DE BORDES SUAVE (Wrap Around)
+      if (head.x < -wrapMargin) head.x = W + wrapMargin;
+      if (head.x > W + wrapMargin) head.x = -wrapMargin;
+      if (head.y < -wrapMargin) head.y = H + wrapMargin;
+      if (head.y > H + wrapMargin) head.y = -wrapMargin;
+
+
+      // Verificar colisión con comida
+      for (let i = 0; i < food.length; i++) {
+        const foodItem = food[i]
+        const distToFood = Math.sqrt((head.x - foodItem.x) ** 2 + (head.y - foodItem.y) ** 2)
+        if (distToFood < 20) {
+          setScore(s => s + 10)
+          food[i] = {
+            x: Math.random() * 750 + 25,
+            y: Math.random() * 550 + 25
+          }
+        }
+      }
+
+      // Actualizar cuerpo
+      snake.unshift(head)
+
+      const targetLength = 15 + Math.floor(score / 2)
+      while (snake.length > targetLength) {
+        snake.pop()
+      }
+
+      for (let i = 1; i < snake.length; i++) {
+        const prev = snake[i - 1]
+        const current = snake[i]
+        const dx = prev.x - current.x
+        const dy = prev.y - current.y
+        const distance = Math.sqrt(dx ** 2 + dy ** 2)
+        const targetDistance = 3
+
+        if (distance > targetDistance) {
+          const ratio = (distance - targetDistance) / distance
+          current.x += dx * ratio * 0.3
+          current.y += dy * ratio * 0.3
+        }
+      }
+
+      // La auto-colisión está eliminada por solicitud previa.
+    }
+
+    const draw = (ctx: CanvasRenderingContext2D) => {
+      const state = gameStateRef.current
+      const { snake, velocity } = state
+      const food = state.food
+
+      // Fondo y Grid
+      ctx.fillStyle = '#0a1f0a'
+      ctx.fillRect(0, 0, 800, 600)
+      ctx.strokeStyle = 'rgba(34, 197, 94, 0.05)'
+      ctx.lineWidth = 1
+      for (let i = 0; i < 800; i += 40) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 600); ctx.stroke() }
+      for (let i = 0; i < 600; i += 40) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(800, i); ctx.stroke() }
+
+      if (snake.length === 0) return
+
+      // --- DIBUJO DE SERPIENTE PELUDA ---
+
+      const drawFuzzySnakeSegment = (segment: { x: number, y: number }, r: number, color: string, blur: number, alpha: number) => {
+        ctx.shadowColor = color
+        ctx.shadowBlur = blur
+        ctx.globalAlpha = alpha
+        ctx.fillStyle = color
+        ctx.beginPath()
+        ctx.arc(segment.x, segment.y, r, 0, Math.PI * 2)
+        ctx.fill()
+      }
+
+      for (let i = 0; i < snake.length; i++) {
+        const segment = snake[i]
+        const t = i / snake.length
+        const radius = 14 * (1 - t * 0.4)
+
+        // Capa 1: Resplandor exterior
+        drawFuzzySnakeSegment(segment, radius, '#7ef542', 30, 0.3)
+
+        // Capa 2: Cuerpo principal
+        drawFuzzySnakeSegment(segment, radius * 0.8, '#7ef542', 20, 0.7)
+
+        // Capa 3: Highlight interior
+        drawFuzzySnakeSegment(segment, radius * 0.6, '#a3e635', 8, 0.9)
+
+        // Capa 4: Core blanco/verde
+        drawFuzzySnakeSegment(segment, radius * 0.4, '#bbf7d0', 5, 0.8)
+
+        // Dibujar el punto de conexión (para continuidad)
+        if (i > 0) {
+          const prev = snake[i - 1]
+          ctx.strokeStyle = '#a3e635';
+          ctx.lineWidth = radius * 2 * 0.8;
+          ctx.globalAlpha = 0.9;
+          ctx.beginPath();
+          ctx.moveTo(prev.x, prev.y);
+          ctx.lineTo(segment.x, segment.y);
+          ctx.stroke();
+        }
+      }
+
+      ctx.globalAlpha = 1
+      ctx.shadowBlur = 0
+
+      // Ojos (Solo en la cabeza)
+      const head = snake[0]
+      const angle = Math.atan2(velocity.y, velocity.x)
+      const eyeDistance = 10
+      const eyeSize = 5
+      const pupilSize = 3
+
+      const anglePerp = angle + Math.PI / 2;
+      const eye1X = head.x + Math.cos(anglePerp) * eyeDistance * 0.5
+      const eye1Y = head.y + Math.sin(anglePerp) * eyeDistance * 0.5
+      const eye2X = head.x - Math.cos(anglePerp) * eyeDistance * 0.5
+      const eye2Y = head.y - Math.sin(anglePerp) * eyeDistance * 0.5
+
+      // Dibuja la parte blanca del ojo
+      ctx.fillStyle = 'white'
+      ctx.beginPath()
+      ctx.arc(eye1X, eye1Y, eyeSize, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.beginPath()
+      ctx.arc(eye2X, eye2Y, eyeSize, 0, Math.PI * 2)
+      ctx.fill()
+
+      // Dibuja la pupila negra (ligeramente desplazada)
+      ctx.fillStyle = '#1a1a1a'
+      const pupilOffset = 1;
+      const pupilX = Math.cos(angle) * pupilOffset;
+      const pupilY = Math.sin(angle) * pupilOffset;
+
+      ctx.beginPath()
+      ctx.arc(eye1X + pupilX, eye1Y + pupilY, pupilSize, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.beginPath()
+      ctx.arc(eye2X + pupilX, eye2Y + pupilY, pupilSize, 0, Math.PI * 2)
+      ctx.fill()
+
+
+      // Comida (Fruta)
+      for (const foodItem of food) {
+        ctx.shadowColor = '#fbbf24'
+        ctx.shadowBlur = 25
+        ctx.fillStyle = '#fbbf24'
+        ctx.beginPath()
+        ctx.arc(foodItem.x, foodItem.y, 12, 0, Math.PI * 2)
+        ctx.fill()
+
+        ctx.shadowBlur = 0
+        const foodGrad = ctx.createRadialGradient(foodItem.x - 4, foodItem.y - 4, 0, foodItem.x, foodItem.y, 12)
+        foodGrad.addColorStop(0, 'rgba(255,255,255,0.8)')
+        foodGrad.addColorStop(1, 'rgba(255,255,255,0)')
+        ctx.fillStyle = foodGrad
+        ctx.beginPath()
+        ctx.arc(foodItem.x, foodItem.y, 12, 0, Math.PI * 2)
+        ctx.fill()
+
+        // Tallo
+        ctx.fillStyle = '#84cc16'
+        ctx.fillRect(foodItem.x - 2, foodItem.y - 16, 4, 8)
+      }
+    }
+
+    animationId = requestAnimationFrame(gameLoop)
+
+    return () => {
+      cancelAnimationFrame(animationId)
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('keyup', handleKeyUp)
+    }
+  }, [isPaused, gameOver, score])
+
+  const restart = () => {
+    gameStateRef.current = {
+      snake: [
+        { x: 300, y: 300 },
+        { x: 295, y: 295 },
+        { x: 290, y: 290 },
+        { x: 285, y: 285 },
+        { x: 280, y: 280 },
+      ],
+      velocity: { x: 1.8, y: 0 },
+      food: [
+        { x: 450, y: 300 },
+        { x: 200, y: 150 },
+        { x: 600, y: 450 }
+      ],
+      keys: new Set<string>(),
+      baseSpeed: 1.8
+    }
     setScore(0)
     setGameOver(false)
     setIsPaused(false)
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-900 via-green-800 to-emerald-900 p-3 sm:p-4 md:p-6 flex items-center justify-center">
-      <div className="w-full max-w-4xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-green-900 to-teal-950 flex items-center justify-center p-4">
+      <div className="max-w-4xl w-full space-y-4">
         {/* Header */}
-        <div className="flex justify-between items-center mb-3 sm:mb-4 md:mb-6">
+        <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 to-green-200">
-              🐍 SNAKE GAME
+            <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-300 to-emerald-400">
+              🐍 SERPIENTE PELUDA
             </h1>
-            <p className="text-xs sm:text-sm text-emerald-300/70">{player.name}</p>
+            <p className="text-green-400/70 text-sm mt-1">Usa ← → / A D para girar. ↑ ↓ / W S para subir/bajar.</p>
           </div>
-          <Button
-            onClick={onBack}
-            variant="outline"
-            className="border-emerald-400/40 text-emerald-300 hover:bg-emerald-500/20 bg-green-950/60 backdrop-blur-sm text-xs sm:text-sm px-3 sm:px-4"
-          >
-            Volver
-          </Button>
-        </div>
-
-        {/* Game Container (Aplica el estilo verde al borde del contenedor) */}
-        <div className="bg-green-950/60 backdrop-blur-md border border-emerald-400/30 rounded-xl p-3 sm:p-4 md:p-6 mb-3 sm:mb-4 md:mb-6 shadow-2xl">
-          <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 md:gap-6">
-            {/* Canvas */}
-            <div className="flex-1">
-              <canvas
-                ref={canvasRef}
-                width={GRID_SIZE * CELL_SIZE}
-                height={GRID_SIZE * CELL_SIZE}
-                // El fondo interior es verde oscuro a través de Canvas
-                className="w-full max-w-full aspect-square border-2 border-emerald-500/30 rounded-lg shadow-lg"
-                onTouchStart={handleTouchStart}
-                onTouchEnd={handleTouchEnd}
-              />
-            </div>
-
-            {/* Stats Sidebar (Con el fondo verde oscuro solicitado) */}
-            <div className="flex lg:flex-col gap-3 sm:gap-4 lg:w-32">
-              <div className="flex-1 lg:flex-none bg-green-900/50 backdrop-blur-sm rounded-lg p-3 sm:p-4 text-center border border-emerald-400/20">
-                <p className="text-xs text-green-200/70 mb-1">Puntuación</p>
-                <p className="text-2xl sm:text-3xl font-black text-emerald-300">{score}</p>
-              </div>
-
-              <div className="flex-1 lg:flex-none bg-green-900/50 backdrop-blur-sm rounded-lg p-3 sm:p-4 text-center border border-cyan-400/20">
-                <p className="text-xs text-green-200/70 mb-1">Longitud</p>
-                <p className="text-xl sm:text-2xl font-black text-cyan-300">{snake.length}</p>
-              </div>
-
-              <div className="flex-1 lg:flex-none bg-green-900/50 backdrop-blur-sm rounded-lg p-3 sm:p-4 text-center border border-yellow-400/20">
-                <p className="text-xs text-green-200/70 mb-1">Estado</p>
-                <p className="text-xs sm:text-sm font-bold text-yellow-300">
-                  {gameOver ? "GAME OVER" : isPaused ? "PAUSADO" : "JUGANDO"}
-                </p>
-              </div>
-            </div>
+          <div className="text-right">
+            <div className="text-5xl font-black text-green-300">{score}</div>
+            <div className="text-xs text-green-400/70">PUNTOS</div>
           </div>
         </div>
 
-        {/* Controles de Juego */}
-        <div className="space-y-3">
+        {/* Canvas */}
+        <div className="relative bg-gradient-to-br from-green-950/60 to-emerald-950/60 backdrop-blur-xl border-2 border-green-500/30 rounded-2xl p-4 shadow-2xl">
+          <canvas
+            ref={canvasRef}
+            width={800}
+            height={600}
+            className="w-full rounded-lg shadow-inner"
+            style={{ imageRendering: 'crisp-edges' }}
+          />
+
+          {/* Overlays */}
           {gameOver && (
-            <div className="bg-red-500/20 backdrop-blur-sm border border-red-400/40 rounded-lg p-3 sm:p-4 text-center">
-              <p className="text-red-300 font-bold text-lg sm:text-xl">¡GAME OVER!</p>
-              <p className="text-sm text-red-200/70 mt-1">Puntuación final: {score}</p>
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center rounded-2xl">
+              <div className="text-center space-y-4">
+                <div className="text-6xl font-black text-red-400">¡GAME OVER!</div>
+                <div className="text-3xl text-green-300">Puntuación: {score}</div>
+                <button
+                  onClick={restart}
+                  className="px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold text-xl rounded-xl shadow-lg hover:scale-105 transition-transform"
+                >
+                  🔄 Jugar de Nuevo
+                </button>
+              </div>
             </div>
           )}
 
-          <div className="flex gap-2 sm:gap-3">
-            <Button
-              onClick={handleRestart}
-              className="flex-1 py-5 sm:py-6 text-sm sm:text-base font-bold bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white rounded-lg shadow-lg"
-            >
-              {gameOver ? "🔄 Reiniciar" : "🎮 Nuevo Juego"}
-            </Button>
-            <Button
-              onClick={() => setIsPaused(!isPaused)}
-              disabled={gameOver}
-              variant="outline"
-              className="flex-1 py-5 sm:py-6 text-sm sm:text-base font-bold border-emerald-400/40 text-emerald-300 hover:bg-emerald-500/20 bg-green-950/60 backdrop-blur-sm disabled:opacity-50 rounded-lg"
-            >
-              {isPaused ? "▶️ Reanudar" : "⏸️ Pausar"}
-            </Button>
-          </div>
-
-          <div className="bg-green-950/40 backdrop-blur-sm border border-emerald-400/20 rounded-lg p-3 sm:p-4">
-            <div className="text-xs sm:text-sm text-green-100 text-center space-y-2">
-              <p className="font-semibold text-emerald-300">📱 Móvil: Desliza en el canvas</p>
-              <p className="font-semibold text-cyan-300">⌨️ PC: Flechas o WASD</p>
-              <p className="text-green-200/70">Come la comida dorada 🟡 para crecer y ganar puntos</p>
+          {isPaused && !gameOver && (
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center rounded-2xl">
+              <div className="text-6xl font-black text-green-300">⏸️ PAUSADO</div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
